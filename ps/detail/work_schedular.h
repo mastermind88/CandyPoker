@@ -30,7 +30,7 @@ namespace detail{
                                         mtx.unlock();
                                         w();
                                         mtx.lock();
-                                        std::cerr << "Done " << ++done << ", " << work_.size() << " Left\n";
+                                        //std::cerr << "Done " << ++done << ", " << work_.size() << " Left\n";
                                         mtx.unlock();
                                 }
                         };

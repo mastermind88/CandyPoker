@@ -17,18 +17,26 @@ namespace bnu = boost::numeric::ublas;
 namespace ps{
 
         struct equity_calc{
+                enum RunType{
+                        RunType_Normal,
+                        RunType_Ordered
+                };
 
                 bool run( bnu::matrix<size_t>& result,
                           std::vector<holdem_id> const& players,
                           std::vector<card_id> const& board = std::vector<card_id>{},
                           std::vector<card_id> const& dead = std::vector<card_id>{})noexcept;
+                bool run_ordered( bnu::matrix<size_t>& result,
+                                  std::vector<holdem_id> const& players,
+                                  std::vector<card_id> const& board = std::vector<card_id>{},
+                                  std::vector<card_id> const& dead = std::vector<card_id>{})noexcept;
         private:
-                template<size_t Num_Players>
+                template<RunType type, size_t Num_Players>
                 bool run_p( bnu::matrix<size_t>& result,
                             std::vector<holdem_id> const& players,
                             std::vector<card_id> const& board,
                             std::vector<card_id> const& dead)noexcept;
-                template<size_t Num_Players, size_t Num_Deal>
+                template<RunType type, size_t Num_Players, size_t Num_Deal>
                 bool run_pd( bnu::matrix<size_t>& result,
                              std::vector<holdem_id> const& players,
                              std::vector<card_id> const& board,

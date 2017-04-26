@@ -90,6 +90,7 @@ namespace ps{
                                         r = execute_top_down( transform, root);
                                 }
                                 transform->end();
+                                transform->debug(std::cerr);
                                 result = result || r;
                         }
                         return false;

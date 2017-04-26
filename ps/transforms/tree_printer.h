@@ -90,6 +90,12 @@ namespace transforms{
         struct tree_printer : symbolic_transform{
                 tree_printer():symbolic_transform{"tree_printer"}{}
                 bool apply(symbolic_computation::handle& ptr)override{
+                        if( ptr->is_terminal()){
+                                impl_.terminal( ptr->to_string() );
+                        } else{
+                                impl_.non_terminal( ptr->to_string() );
+                        }
+                        #if 0
                         std::stringstream line;
 
                         switch(ptr->get_kind()){
@@ -143,6 +149,7 @@ namespace transforms{
                                 return false;
                         }
                         }
+                        #endif
                                 
 
                         return false;

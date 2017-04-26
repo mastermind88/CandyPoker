@@ -26,8 +26,10 @@ namespace transforms{
                         }
                         sch.run();
 
+                        #if 1
                         // pretty print
                         for( auto ptr : prims_){
+                                #if 0
                                 auto ret{ ptr->calculate(*ctx_)  };
                                 std::cout << ptr->to_string() << " | ";
                                 for(size_t i=0; i != ptr->get_hands().size(); ++i){
@@ -36,7 +38,22 @@ namespace transforms{
                                         std::cout << boost::format("%8.4f | ") % eq;
                                 }
                                 std::cout << "\n";
+                                #endif
+                                #if 0
+                                auto ret{ ptr->calculate(*ctx_)  };
+                                std::cout 
+                                        << ptr->get_hash() 
+                                        << "," << ret(0,0) 
+                                        << "," << ptr->to_string();
+                                for(size_t i=0; i != ptr->get_hands().size(); ++i){
+                                        auto eq{
+                                                static_cast<double>(ret(i,10) ) / computation_equity_fixed_prec / ret(i,9) * 100 };
+                                        std::cout << boost::format(",%d,%d,%d,%.4f") % ret(i,0) % ret(i,1) % ret(i,2) % eq;
+                                }
+                                std::cout << "\n";
+                                #endif
                         }
+                        #endif
                 }
         private:
                 calculation_context* ctx_;

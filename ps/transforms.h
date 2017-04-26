@@ -18,6 +18,7 @@
 #include "ps/transforms/permutate_for_the_better.h"
 #include "ps/transforms/remove_suit_perms.h"
 #include "ps/transforms/tree_printer.h"
+#include "ps/transforms/dealer.h"
 
 
 #endif // PS_TRANSFORMS_H

@@ -11,6 +11,7 @@ namespace transforms{
                                 return false;
                         
                         auto hands{ reinterpret_cast<symbolic_primitive*>(ptr.get())->get_hands()};
+                        auto board{ reinterpret_cast<symbolic_primitive*>(ptr.get())->get_board()};
                         std::vector< std::tuple< size_t, std::string> > player_perm;
                         for(size_t i=0;i!=hands.size();++i){
                                 auto h{ holdem_hand_decl::get( hands[i].get() ) };
@@ -57,12 +58,22 @@ namespace transforms{
                                                 h.second().rank(),
                                                 suit_perms[h.second().suit()]));
                         }
+                        std::vector<id_type> perm_board;
+                        for(size_t i=0;i != board.size();++i){
+                                auto b{ card_decl::get( board[i] ) };
+                                perm_board.emplace_back(
+                                        card_decl::make_id(
+                                                b.rank(),
+                                                suit_perms[b.suit()]));
+                        }
+                        boost::sort(perm_board);
                         ptr = std::make_shared<symbolic_player_perm>( 
                                 perm,
                                 std::make_shared<symbolic_suit_perm>(
                                         suit_perms,
                                         std::make_shared<symbolic_primitive>(
-                                                perm_hands
+                                                perm_hands,
+                                                perm_board
                                         )
                                 )
                         );

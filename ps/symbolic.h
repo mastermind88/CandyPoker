@@ -161,6 +161,7 @@ namespace ps{
                                 Kind_Symbolic_Primitive_Range,
                                 Kind_Symbolic_Player_Perm,
                                 Kind_Symbolic_Suit_Perm,
+                                Kind_Symbolic_Non_Terminal,
                         End_NonTerminals
                 };
 
@@ -191,6 +192,25 @@ namespace ps{
                         return ! is_terminal();
                 }
 
+                virtual std::string to_string()const{
+                        switch(get_kind()){
+                        case Kind_Symbolic_Primitive:
+                                return "primitve";
+                        case Kind_Symbolic_Range:
+                                return "range";
+                        case Kind_Symbolic_Primitive_Range:
+                                return "primitive_range";
+                        case Kind_Symbolic_Player_Perm:
+                                return "player_perm";
+                        case Kind_Symbolic_Suit_Perm:
+                                return "suit_perm";
+                        case Kind_Symbolic_Non_Terminal:
+                                return "non_terminal";
+                        default:
+                                return "unknown";
+                        }
+                }
+
         private:
                 kind kind_;
         };
@@ -204,7 +224,9 @@ namespace ps{
 
                 using iterator= std::list<handle>::iterator;
 
-                explicit symbolic_non_terminal(kind k):symbolic_computation{k}{}
+                explicit symbolic_non_terminal(kind k = Kind_Symbolic_Non_Terminal)
+                        :symbolic_computation{k}
+                {}
 
                 auto begin(){ return children_.begin(); }
                 auto end(){ return children_.end(); }
@@ -218,7 +240,7 @@ namespace ps{
                 void erase_child(iterator iter){
                         children_.erase(iter);
                 }
-                handle get_only_child(){ 
+                handle& get_only_child(){ 
                         assert( children_.size() ==1 && "preconditon failed");
                         return children_.back();
                 }
@@ -230,6 +252,16 @@ namespace ps{
                         for( auto const& c : get_children() ){
                                 c->print_impl(ctx);
                         }
+                }
+                bnu::matrix<size_t> calculate(calculation_context& cache)override{
+                        auto iter{ begin() };
+                        auto last{ end() };
+                        bnu::matrix<size_t> result { (*iter)->calculate(cache) };
+                        ++iter;
+                        for(;iter!=last;++iter){
+                                result += (*iter)->calculate(cache);
+                        }
+                        return result;
                 }
 
 
@@ -316,9 +348,12 @@ namespace ps{
 
         
         struct symbolic_primitive : symbolic_computation{
-                symbolic_primitive(std::vector<frontend::hand> const& hands)
+                symbolic_primitive(std::vector<frontend::hand> const& hands,
+                                   std::vector<id_type> const& board = std::vector<id_type>{}) 
                         :symbolic_computation(Kind_Symbolic_Primitive),
-                        hands_{hands}, hash_{make_hash(hands_)}
+                        hands_{hands},
+                        board_{board},
+                        hash_{make_hash(hands_, board_)}
                 {
                 }
                 
@@ -332,8 +367,11 @@ namespace ps{
                                 //<<  "  (" << hash_ << ")\n";
                 }
                 decltype(auto) get_hands()const{ return hands_; }
+                decltype(auto) get_board()const{ return board_; }
 
-                static std::string make_hash( std::vector<frontend::hand> const& hands){
+                static std::string make_hash( std::vector<frontend::hand> const& hands,
+                                              std::vector<id_type> const& board)
+                {
                         std::string hash;
                         for( auto h : hands ){
                                 // XXX hash :(
@@ -348,6 +386,10 @@ namespace ps{
                                 else
                                         hash += alt_atom;
                         }
+                        hash += ":";
+                        for( auto b : board ){
+                                hash += card_decl::get(b).to_string();
+                        }
                         return std::move(hash);
                 }
                 std::string const& get_hash()const{ return hash_; }
@@ -360,21 +402,28 @@ namespace ps{
                                         players.push_back(h.get());
                                 }
                                 bnu::matrix<size_t> ret;
-                                cache.ec.run( ret, players );
+                                cache.ec.run_ordered( ret, players, board_);
                                 cache_ = std::move(ret);
                         }
                         return *cache_;
                 }
-                std::string to_string()const{
+                std::string to_string()const override{
                         std::stringstream sstr;
                         for(size_t i{0};i!=get_hands().size();++i){
                                 if( i != 0 ) sstr << " vs ";
                                 sstr << get_hands()[i];
                         }
+                        if( board_.size()){
+                                sstr << " on board ";
+                                for(size_t i{0};i!=board_.size();++i){
+                                        sstr << card_decl::get(board_[i]);
+                                }
+                        }
                         return sstr.str();
                 }
         private:
                 std::vector<frontend::hand> hands_;
+                std::vector<id_type> board_;
                 std::string hash_;
                 boost::optional< bnu::matrix<size_t> > cache_;
         };
@@ -585,5 +634,9 @@ namespace ps{
                 std::vector<frontend::range> players_;
 
         };
+
+
+
+
 } // ps
 #endif // PS_SYMBOLIC_H
