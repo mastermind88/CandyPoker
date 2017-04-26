@@ -268,7 +268,7 @@ namespace ps{
         private:
                 std::list<handle> children_;
         };
-
+        
 
         struct symbolic_suit_perm : symbolic_non_terminal{
                 explicit symbolic_suit_perm( std::vector<int> const& suit_perm,

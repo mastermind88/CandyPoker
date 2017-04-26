@@ -26,8 +26,9 @@ namespace transforms{
                         }
                         sch.run();
 
-                        #if 1
+                        #if 0
                         // pretty print
+                        std::set<std::string> mem;
                         for( auto ptr : prims_){
                                 #if 0
                                 auto ret{ ptr->calculate(*ctx_)  };
@@ -39,7 +40,11 @@ namespace transforms{
                                 }
                                 std::cout << "\n";
                                 #endif
-                                #if 0
+                                #if 1
+                                if( mem.count( ptr->get_hash() ) )
+                                        continue;
+                                mem.insert( ptr->get_hash() );
+                                        
                                 auto ret{ ptr->calculate(*ctx_)  };
                                 std::cout 
                                         << ptr->get_hash() 
