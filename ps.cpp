@@ -126,11 +126,15 @@ int main(){
         villian.set_hand( holdem_hand_decl::parse("As2h"));
         villian.set_class( holdem_class_decl::parse("22"));
 
-        cross_product([](auto a, auto b){
-                PRINT_SEQ((a.class_())(b.class_()));
+        std::vector<range> sit;
+        sit.push_back(hero);
+        sit.push_back(villian);
+
+        cross_product([](auto const& vec){
+                PRINT_SEQ((vec[0].class_())(vec[1].class_()));
                 cross_product([](auto a, auto b){
                         PRINT_SEQ((a.decl())(b.decl()));
                 },*a, *b);
-        },hero, villian);
+        }, sit);
 
 }

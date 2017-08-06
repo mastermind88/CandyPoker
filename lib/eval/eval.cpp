@@ -26,9 +26,9 @@ struct detail_eval_impl{
         void next( bool f, long a, long b, long c, long d, long e){
                 auto m = map_rank(a,b,c,d,e);
                 if( f )
-                        flush_map_[m] = order_;
+                        flush_map_[m].assign(order_, name_);
                 else
-                        rank_map_[m] = order_;
+                        rank_map_[m].assign(order_, name_);
                 ++order_;
         }
         void begin(std::string const& name){
@@ -36,10 +36,10 @@ struct detail_eval_impl{
         }
         void end(){}
 
-        auto eval_flush(std::uint32_t m)const noexcept{
+        ranking const& eval_flush(std::uint32_t m)const noexcept{
                 return flush_map_[m];
         }
-        auto eval_flush(long a, long b, long c, long d, long e)const noexcept{
+        ranking const& eval_flush(long a, long b, long c, long d, long e)const noexcept{
                 std::uint32_t m = map_rank( rank_device_[a],rank_device_[b],
                                             rank_device_[c],rank_device_[d],
                                             rank_device_[e]);
@@ -47,16 +47,16 @@ struct detail_eval_impl{
         }
 
 
-        auto eval_rank(std::uint32_t m)const noexcept{
+        ranking const& eval_rank(std::uint32_t m)const noexcept{
                 return rank_map_[m];
         }
-        auto eval_rank(long a, long b, long c, long d, long e)const noexcept{
+        ranking const& eval_rank(long a, long b, long c, long d, long e)const noexcept{
                 std::uint32_t m = map_rank( rank_device_[a],rank_device_[b],
                                             rank_device_[c],rank_device_[d],
                                             rank_device_[e]);
                 return eval_rank(m);
         }
-        auto eval_rank(long a, long b, long c, long d, long e, long f)const noexcept{
+        ranking const& eval_rank(long a, long b, long c, long d, long e, long f)const noexcept{
                 std::uint32_t m = map_rank( rank_device_[a],rank_device_[b],
                                             rank_device_[c],rank_device_[d],
                                             rank_device_[e],rank_device_[f]);
@@ -79,16 +79,13 @@ protected:
 private:
         size_t order_;
         std::string name_;
-        std::vector<std::uint32_t> flush_map_;
-        std::vector<std::uint32_t> rank_map_;
-
+        std::vector<ranking> flush_map_;
+        std::vector<ranking> rank_map_;
 };
 
 struct detail_eval: detail_eval_impl{
         detail_eval(){
                 cache_6_.resize( 37*37*37*37*31*31+1);
-        }
-        void init(){
                 generate(*this);
                 detail::visit_combinations<6>(
                         [this](long a, long b, long c, long d, long e, long f){
@@ -116,14 +113,14 @@ struct detail_eval: detail_eval_impl{
         ~detail_eval(){
         }
 
-        std::uint32_t operator()(long a, long b, long c, long d, long e)const{
+        ranking const& operator()(long a, long b, long c, long d, long e)const{
                 auto f_aux =  flush_device_[a] * flush_device_[b] * flush_device_[c] * flush_device_[d] * flush_device_[e] ;
                 std::uint32_t m = map_rank( rank_device_[a],
                                             rank_device_[b], 
                                             rank_device_[c],
                                             rank_device_[d], 
                                             rank_device_[e]);
-                std::uint32_t ret;
+                ranking const* ret;
 
 
                 switch(f_aux){
@@ -131,17 +128,17 @@ struct detail_eval: detail_eval_impl{
                 case 3*3*3*3*3:
                 case 5*5*5*5*5:
                 case 7*7*7*7*7:
-                        ret = eval_flush(m);
+                        ret = &eval_flush(m);
                         break;
                 default:
-                        ret = eval_rank(m);
+                        ret = &eval_rank(m);
                         break;
                 }
                 //PRINT_SEQ((a)(b)(c)(d)(e)(ret));
-                return ret;
+                return *ret;
         }
-        std::uint32_t eval_brute(long a, long b, long c, long d, long e, long f)const{
-                std::array<std::uint32_t, 6> aux { 
+        ranking const& eval_brute(long a, long b, long c, long d, long e, long f)const{
+                std::array<ranking, 6> aux { 
                         (*this)(  b,c,d,e,f),
                         (*this)(a,  c,d,e,f),
                         (*this)(a,b,  d,e,f),
@@ -151,7 +148,7 @@ struct detail_eval: detail_eval_impl{
                 };
                 return * std::min_element(aux.begin(), aux.end() );
         }
-        std::uint32_t operator()(long a, long b, long c, long d, long e, long f)const{
+        ranking const& operator()(long a, long b, long c, long d, long e, long f)const{
                 //return eval_brute(a,b,c,d,e,f);
                 auto f_aux =  flush_device_[a] * flush_device_[b] * flush_device_[c] * flush_device_[d] * flush_device_[e] * flush_device_[f] ;
 
@@ -181,8 +178,8 @@ struct detail_eval: detail_eval_impl{
 
                 return cache_6_[m];
         }
-        std::uint32_t eval_brute(long a, long b, long c, long d, long e, long f, long g)const{
-                std::array<std::uint32_t, 7> aux = {
+        ranking const& eval_brute(long a, long b, long c, long d, long e, long f, long g)const{
+                std::array<ranking, 7> aux = {
                         (*this)(  b,c,d,e,f,g),
                         (*this)(a,  c,d,e,f,g),
                         (*this)(a,b,  d,e,f,g),
@@ -193,7 +190,7 @@ struct detail_eval: detail_eval_impl{
                 };
                 return * std::min_element(aux.begin(), aux.end() );
         }
-        std::uint32_t operator()(long a, long b, long c, long d, long e, long f, long g)const{
+        ranking const& operator()(long a, long b, long c, long d, long e, long f, long g)const{
                 //return eval_brute(a,b,c,d,e,f,g);
                 auto f_aux = flush_device_[a] * flush_device_[b] * flush_device_[c] * 
                             flush_device_[d] * flush_device_[e] * flush_device_[f] * 
@@ -215,7 +212,7 @@ struct detail_eval: detail_eval_impl{
                         rank_device_[f],
                         rank_device_[g]
                 };
-                std::array<std::uint32_t, 7> aux = {
+                std::array<ranking, 7> aux = {
                         cache_6_[ map_rank(      r[1], r[2], r[3], r[4], r[5], r[6]) ],
                         cache_6_[ map_rank(r[0]      , r[2], r[3], r[4], r[5], r[6]) ],
                         cache_6_[ map_rank(r[0], r[1]      , r[3], r[4], r[5], r[6]) ],
@@ -241,9 +238,27 @@ struct detail_eval: detail_eval_impl{
 #endif
         }
 private:
-        std::vector<std::uint32_t> cache_6_;
+        std::vector<ranking> cache_6_;
 };
 
+
+struct fast_evaluater : evaluater{
+        ranking const& rank(long a, long b, long c, long d, long e)const override{
+                return impl_->operator()(a,b,c,d,e);
+        }
+        ranking const& rank(long a, long b, long c, long d, long e, long f)const override{
+                return impl_->operator()(a,b,c,d,e,f);
+        }
+        ranking const& rank(long a, long b, long c, long d, long e, long f, long g)const override{
+                return impl_->operator()(a,b,c,d,e,f,g);
+        }
+private:
+        detail_eval impl_;
+};
+
+int fear = ( support::singleton_factory::register_<fast_evaluater>("fast_evaluater"),0);
+
+#if 0
 /*
  * by far easiest option
  */
@@ -287,6 +302,7 @@ std::uint32_t eval::operator()(long a, long b, long c, long d, long e, long f)co
 std::uint32_t eval::operator()(long a, long b, long c, long d, long e, long f, long g)const{
         return get_impl()->operator()(a,b,c,d,e,f,g);
 }
+#endif
 
 
 
