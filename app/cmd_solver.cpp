@@ -148,8 +148,11 @@ namespace ps{
                         auto push_s = decl.make_all_push(state);
                                         
 
-                        auto fold_ev = strategy_desc.expected_value_by_class_id(decl.player_index(), fold_s);
-                        auto push_ev = strategy_desc.expected_value_by_class_id(decl.player_index(), push_s);
+                        auto fold_ev_r = strategy_desc.expected_value_by_class_id(decl.player_index(), fold_s);
+                        auto push_ev_r = strategy_desc.expected_value_by_class_id(decl.player_index(), push_s);
+
+                        auto fold_ev = fold_ev_r.to_eigen();
+                        auto push_ev = push_ev_r.to_eigen();
                         
 
                         Eigen::VectorXd counter(169);
@@ -991,7 +994,7 @@ namespace ps{
                         auto from_ev = desc->expected_value(from);
                         auto to_ev = desc->expected_value(to);
 
-                        auto delta = from_ev - to_ev;
+                        auto delta = from_ev.to_eigen() - to_ev.to_eigen();
                         auto norm = delta.lpNorm<1>();
                         auto cond = ( norm < epsilon_ );
                         if( cond ){
@@ -1023,7 +1026,7 @@ namespace ps{
                 virtual holdem_binary_solver_ctrl step(holdem_binary_solver const* solver, state_type const& from, state_type const& to)override{
                         auto desc = solver->get_description();
                         auto to_ev = desc->expected_value(to);
-                        seq_.push_back(to_ev);
+                        seq_.push_back(to_ev.to_eigen());
                         return Continue{};
                 }
                 boost::optional<std::vector<min_max_type> > make_min_max(size_t lookback)const{
@@ -1541,7 +1544,8 @@ namespace ps{
                                 lines.push_back(LineBreak);
                                 for(auto const& sol : mgr){
                                         auto desc = sol.description();
-                                        auto ev = desc->expected_value(sol.solution());
+                                        auto ev_r = desc->expected_value(sol.solution());
+                                        auto ev = ev_r.to_eigen();
                                         std::vector<std::string> line;
                                         char buf[18];
                                         std::sprintf(buf, "%.1f", desc->eff());

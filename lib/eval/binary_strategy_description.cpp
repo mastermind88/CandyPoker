@@ -49,7 +49,7 @@ namespace ps{
                         key_{key}, vec_{vec}
                 {}
                 virtual std::string key()const override{ return key_; }
-                virtual void expected_value_given_event(Eigen::VectorXd& out, holdem_class_vector const& cv, double p)const override{
+                virtual void expected_value_given_event(binary_strategy_description::eval_result& out, holdem_class_vector const& cv, double p)const override{
                         for(size_t idx=0;idx!=vec_.size();++idx){
                                 out[idx] += vec_[idx] * p;
                         }
@@ -97,7 +97,7 @@ namespace ps{
 
                 }
                 virtual std::string key()const override{ return key_; }
-                virtual void expected_value_given_event(Eigen::VectorXd& out, holdem_class_vector const& cv, double p)const override{
+                virtual void expected_value_given_event(binary_strategy_description::eval_result& out, holdem_class_vector const& cv, double p)const override{
 
                         // short circuit for optimization purposes
                         if( std::fabs(p) < 0.001 )
@@ -138,7 +138,7 @@ namespace ps{
                         auto ev_ptr = eval_->eval_no_perm(tmp_view);
                         auto const& ev = *ev_ptr;
                         
-                        out += delta_proto_ * p;
+                        out.vector_add(delta_proto_ * p);
 
                         size_t ev_idx = 0;
                         for(size_t idx=0;idx!=perm_.size();++idx){
@@ -225,21 +225,19 @@ namespace ps{
                         sstr << "unknown key " << key;
                         throw std::domain_error(sstr.str());
                 }
-                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
-                        Eigen::VectorXd result(169);
-                        result.fill(0);
+                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
+                        eval_result result(169);
                         for(auto const& group : *Memory_TwoPlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;
                                         auto ev = expected_value_of_vector(aux_event_set_, cv, impl);
-                                        result(cv[player_idx]) += _.prob * ev[player_idx];
+                                        result[cv[player_idx]] += _.prob * ev[player_idx];
                                 }
                         }
                         return result;
                 }
-                virtual Eigen::VectorXd expected_value(strategy_impl_t const& impl)const override{
-                        Eigen::VectorXd result(2);
-                        result.fill(0);
+                virtual eval_result expected_value(strategy_impl_t const& impl)const override{
+                        eval_result result(2);
                         for(auto const& group : *Memory_TwoPlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;
@@ -432,21 +430,19 @@ namespace ps{
                         if( Debug ) std::cout << dbg.str() << "\n";
                         return result;
                 }
-                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
-                        Eigen::VectorXd result(169);
-                        result.fill(0);
+                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
+                        eval_result result(169);
                         for(auto const& group : *Memory_ThreePlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;
                                         auto ev = expected_value_of_vector(aux_event_set_, cv, impl);
-                                        result(cv[player_idx]) += _.prob * ev[player_idx];
+                                        result[cv[player_idx]] += _.prob * ev[player_idx];
                                 }
                         }
                         return result;
                 }
-                virtual Eigen::VectorXd expected_value(strategy_impl_t const& impl)const override{
-                        Eigen::VectorXd result(3);
-                        result.fill(0);
+                virtual eval_result expected_value(strategy_impl_t const& impl)const override{
+                        eval_result result(3);
                         for(auto const& group : *Memory_ThreePlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;

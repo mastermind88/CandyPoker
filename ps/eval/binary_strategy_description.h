@@ -62,6 +62,22 @@ namespace ps{
                 struct eval_view{
                         virtual std::vector<double> const* eval_no_perm(support::array_view<holdem_class_id> const& view)const noexcept=0;
                 };
+
+                struct eval_result{
+                        eval_result(size_t n){
+                                v_.resize(n);
+                                v_.fill(0.0);
+                        }
+                        void vector_add(Eigen::VectorXd const& that)noexcept{
+                                v_ += that;
+                        }
+                        auto& operator[](size_t idx)noexcept{
+                                return v_[idx];
+                        }
+                        Eigen::VectorXd const& to_eigen()const{ return v_; }
+                private:
+                        Eigen::VectorXd v_;
+                };
                 /*
                  *  We are constraied to only events which can be represented by a key,
                  *  for push/fold solving this is appropraite.
@@ -70,8 +86,8 @@ namespace ps{
                 struct event_decl{
                         virtual ~event_decl()=default;
                         virtual std::string key()const=0;
-                        virtual void expected_value_given_event(Eigen::VectorXd& out, holdem_class_vector const& cv, double p = 1.0)const=0;
-                        virtual double expected_value_of_event(binary_strategy_description const* desc, Eigen::VectorXd& out, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
+                        virtual void expected_value_given_event(eval_result& out, holdem_class_vector const& cv, double p = 1.0)const=0;
+                        virtual double expected_value_of_event(binary_strategy_description const* desc, eval_result& out, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
                                 auto p = desc->probability_of_event(key(), cv, impl);
                                 expected_value_given_event(out, cv, p);
                                 return p;
@@ -95,9 +111,8 @@ namespace ps{
 
                 // the ev GIVEN a certain deal
                 //    result = \sum P(q) * E[q]
-                Eigen::VectorXd expected_value_of_vector(event_set const& es, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
-                        Eigen::VectorXd vec(num_players()+1);
-                        vec.fill(0);
+                eval_result expected_value_of_vector(event_set const& es, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
+                        eval_result vec(num_players());
                         double sigma = 0.0;
                         for(auto iter(es.begin()),end(es.end());iter!=end;++iter){
                                 sigma += (*iter)->expected_value_of_event(this, vec, cv, impl);
@@ -106,14 +121,14 @@ namespace ps{
                         //vec /= sigma;
                         return vec;
                 }
-                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const=0;
+                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const=0;
                 virtual double expected_value_for_class_id(size_t player_idx, holdem_class_id class_id, strategy_impl_t const& impl)const{
                         return expected_value_for_class_id_es(aux_event_set_, player_idx, class_id, impl);
                 }
                 virtual double expected_value_for_class_id_es(event_set const& es, size_t player_idx, holdem_class_id class_id, strategy_impl_t const& impl)const{
                         throw std::domain_error("not implemented");
                 }
-                virtual Eigen::VectorXd expected_value(strategy_impl_t const& impl)const=0;
+                virtual eval_result expected_value(strategy_impl_t const& impl)const=0;
 
                 virtual double probability_of_event(std::string const& key, holdem_class_vector const& cv, strategy_impl_t const& impl)const=0;
 
@@ -139,9 +154,10 @@ namespace ps{
                                 desc_(desc),
                                 action_(action)
                         {
-                                std::cout << "action_ => " << action_ << "\n"; // __CandyPrint__(cxx-print-scalar,action_)
+                                // TODO, this needs to be generalized
+                                //std::cout << "action_ => " << action_ << "\n"; // __CandyPrint__(cxx-print-scalar,action_)
                                 for(auto ei(self_->begin_event()),ee(self_->end_event());ei!=ee;++ei){
-                                        std::cout << "ei->key().substr(0, action_.size()) => " << ei->key().substr(0, action_.size()) << "\n"; // __CandyPrint__(cxx-print-scalar,ei->key().substr(0, action_.size()))
+                                        //std::cout << "ei->key().substr(0, action_.size()) => " << ei->key().substr(0, action_.size()) << "\n"; // __CandyPrint__(cxx-print-scalar,ei->key().substr(0, action_.size()))
                                         if( ei->key().substr(0, action_.size()) == action_ ){
                                                 std::cout << "done\n";
                                                 events_.push_back(&*ei);
