@@ -64,6 +64,7 @@ namespace ps{
                 Eigen::VectorXd vec_;
         };
         struct eval_event : binary_strategy_description::event_decl{
+                enum{ ShortCircuitTargetPlayer = true };
                 enum{ Debug = 0 };
                 /*
                         perm is the vector of players who are in the hand, ie for hu eval
@@ -95,6 +96,11 @@ namespace ps{
                                 std::cout << "pot_amt_ => " << pot_amt_ << "\n"; // __CandyPrint__(cxx-print-scalar,pot_amt_)
                         }
 
+                        mask_.fill(0);
+                        for(auto _ : perm){
+                                mask_[_] = 1;
+                        }
+
                 }
                 virtual std::string key()const override{ return key_; }
                 virtual void expected_value_given_event(binary_strategy_description::eval_result& out, holdem_class_vector const& cv, double p)const override{
@@ -102,6 +108,16 @@ namespace ps{
                         // short circuit for optimization purposes
                         if( std::fabs(p) < 0.001 )
                                 return;
+
+                        // 
+                        if( ShortCircuitTargetPlayer ){
+                                if( out.target_player() != -1 ){
+                                        if( ! mask_[out.target_player()] ){
+                                                out.vector_add(delta_proto_ * p);
+                                                return;
+                                        }
+                                }
+                        }
 
                         #if 0
                         struct stride_view{
@@ -165,6 +181,8 @@ namespace ps{
                 Eigen::VectorXd active_; // not used
                 Eigen::VectorXd delta_proto_;
                 double pot_amt_;
+                // for quick access 
+                std::array<bool, 9> mask_;
         };
 
 
@@ -225,8 +243,8 @@ namespace ps{
                         sstr << "unknown key " << key;
                         throw std::domain_error(sstr.str());
                 }
-                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
-                        eval_result result(169);
+                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
+                        Eigen::VectorXd result(169);
                         for(auto const& group : *Memory_TwoPlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;
@@ -430,8 +448,8 @@ namespace ps{
                         if( Debug ) std::cout << dbg.str() << "\n";
                         return result;
                 }
-                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
-                        eval_result result(169);
+                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const override{
+                        Eigen::VectorXd result(169);
                         for(auto const& group : *Memory_ThreePlayerClassVector){
                                 for(auto const& _ : group.vec){
                                         auto const& cv = _.cv;
@@ -464,8 +482,10 @@ namespace ps{
                                         cv = _.cv;
                                         if( player_idx != 0 )
                                                 std::swap(cv[0], cv[player_idx]);
-                                        auto ev = expected_value_of_vector(es, cv, impl);
-                                        result += _.prob * ev[player_idx];
+                                        eval_result sub_result(cv.size());
+                                        sub_result.set_target_player(player_idx);
+                                        expected_value_of_vector_impl(sub_result, es, cv, impl);
+                                        result += _.prob * sub_result[player_idx];
                                 }
                         }
                         return result;

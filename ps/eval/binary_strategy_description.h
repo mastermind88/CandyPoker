@@ -11,6 +11,7 @@
 
 namespace ps{
 
+
         /*
                 Need a way to abstract the strategy represention.
                 
@@ -75,8 +76,15 @@ namespace ps{
                                 return v_[idx];
                         }
                         Eigen::VectorXd const& to_eigen()const{ return v_; }
+
+                        /*
+                         * sometimes we only care about one player
+                         */
+                        size_t target_player()const{ return only_player_; }
+                        void set_target_player(size_t idx){ only_player_ = idx; }
                 private:
                         Eigen::VectorXd v_;
+                        size_t only_player_{static_cast<size_t>(-1)};
                 };
                 /*
                  *  We are constraied to only events which can be represented by a key,
@@ -113,15 +121,19 @@ namespace ps{
                 //    result = \sum P(q) * E[q]
                 eval_result expected_value_of_vector(event_set const& es, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
                         eval_result vec(num_players());
-                        double sigma = 0.0;
-                        for(auto iter(es.begin()),end(es.end());iter!=end;++iter){
-                                sigma += (*iter)->expected_value_of_event(this, vec, cv, impl);
-                        }
+                        auto sigma = expected_value_of_vector_impl(vec, es, cv, impl);
                         // TODO not sure why but this changed the convergence?
                         //vec /= sigma;
                         return vec;
                 }
-                virtual eval_result expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const=0;
+                double expected_value_of_vector_impl(eval_result& result, event_set const& es, holdem_class_vector const& cv, strategy_impl_t const& impl)const{
+                        double sigma = 0.0;
+                        for(auto iter(es.begin()),end(es.end());iter!=end;++iter){
+                                sigma += (*iter)->expected_value_of_event(this, result, cv, impl);
+                        }
+                        return sigma;
+                }
+                virtual Eigen::VectorXd expected_value_by_class_id(size_t player_idx, strategy_impl_t const& impl)const=0;
                 virtual double expected_value_for_class_id(size_t player_idx, holdem_class_id class_id, strategy_impl_t const& impl)const{
                         return expected_value_for_class_id_es(aux_event_set_, player_idx, class_id, impl);
                 }
@@ -159,7 +171,7 @@ namespace ps{
                                 for(auto ei(self_->begin_event()),ee(self_->end_event());ei!=ee;++ei){
                                         //std::cout << "ei->key().substr(0, action_.size()) => " << ei->key().substr(0, action_.size()) << "\n"; // __CandyPrint__(cxx-print-scalar,ei->key().substr(0, action_.size()))
                                         if( ei->key().substr(0, action_.size()) == action_ ){
-                                                std::cout << "done\n";
+                                                //std::cout << "done\n";
                                                 events_.push_back(&*ei);
                                         }
                                 }

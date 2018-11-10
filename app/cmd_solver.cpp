@@ -148,12 +148,9 @@ namespace ps{
                         auto push_s = decl.make_all_push(state);
                                         
 
-                        auto fold_ev_r = strategy_desc.expected_value_by_class_id(decl.player_index(), fold_s);
-                        auto push_ev_r = strategy_desc.expected_value_by_class_id(decl.player_index(), push_s);
+                        auto fold_ev = strategy_desc.expected_value_by_class_id(decl.player_index(), fold_s);
+                        auto push_ev = strategy_desc.expected_value_by_class_id(decl.player_index(), push_s);
 
-                        auto fold_ev = fold_ev_r.to_eigen();
-                        auto push_ev = push_ev_r.to_eigen();
-                        
 
                         Eigen::VectorXd counter(169);
                         counter.fill(0);
@@ -198,11 +195,11 @@ namespace ps{
                         counter.fill(0);
                         for(holdem_class_id class_idx=0;class_idx!=169;++class_idx){
                                 auto fold_ev = strategy_desc.expected_value_for_class_id(decl.player_index(),
-                                                                                 class_idx,
-                                                                                 fold_s);
+                                                                                         class_idx,
+                                                                                         fold_s);
                                 auto push_ev = strategy_desc.expected_value_for_class_id(decl.player_index(),
-                                                                                 class_idx,
-                                                                                 push_s);
+                                                                                         class_idx,
+                                                                                         push_s);
                                 double val = ( fold_ev <= push_ev ? 1.0 : 0.0 );
                                 counter[class_idx] = val;
                         }
@@ -1425,7 +1422,7 @@ namespace ps{
                                         solver.add_observer(std::make_shared<table_observer>(desc_.get(), true));
                                         solver.add_observer(std::make_shared<strategy_printer>());
                                 }
-                                //solver.add_observer(std::make_shared<solver_ledger>(ledger));
+                                solver.add_observer(std::make_shared<solver_ledger>(ledger));
                                 solver.add_observer(std::make_shared<lp_inf_stoppage_condition>(lp_epsilon_));
                                 solver.add_observer(std::make_shared<max_steps_condition>(max_steps_));
                                 solver.add_observer(std::make_shared<state_seq>());
@@ -1482,7 +1479,7 @@ namespace ps{
                                                                        eff);
                                 items_.push_back(item);
                         }
-                        mgr_.try_load_or_default(".computation_mgr_other");
+                        mgr_.try_load_or_default(".computation_mgr");
                 }
                 void compute(){
                         std::vector<std::future<void> > v;
@@ -1564,18 +1561,20 @@ namespace ps{
                 virtual int Execute()override{
 
                         computation_decl cd;
-                        std::string dir = ".SolverCacheOther";
+                        std::string dir = ".SolverCache";
                         cd.Directory = dir;
                         double start_eff = 2.0;
+                        double end_eff = 20.0;
 
                         double d = 0.1;
                         if( args_.size() && args_[0] == "three"){
                                 cd.N = 3;
                                 d = 1.0;
                                 start_eff = 10.0;
+                                end_eff = 20.0;
                         }
 
-                        for(double eff=start_eff;eff-1e-5 < 20.0;eff += d ){
+                        for(double eff=start_eff;eff-1e-5 < end_eff;eff += d ){
                                 cd.EffectiveStacks.push_back(eff);
                         }
 
