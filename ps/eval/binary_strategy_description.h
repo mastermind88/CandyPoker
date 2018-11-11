@@ -22,6 +22,8 @@ namespace ps{
                 For a three player game, we have a 6-vector of 169-vectors,
                 which each value \in [0,1] which reprents of the probaily
                 of pushing, given the previous action
+
+
          */
         struct binary_strategy_description{
                 using strategy_impl_t = std::vector<Eigen::VectorXd>;

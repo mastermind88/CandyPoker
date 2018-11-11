@@ -55,6 +55,276 @@
 #include "ps/support/persistent_impl.h"
 
 
+namespace ExpressionTreeV1{
+        using namespace ps;
+
+        struct ProbabilityDistribution{
+        };
+
+        struct Probability{
+                virtual ~Probability()=default;
+                virtual double Eval(Eigen::VectorXd const& F)const=0;
+        };
+        struct ProbabilityIndex : Probability{
+                ProbabilityIndex(std::vector<size_t> const& index)
+                        :index_(index)
+                {}
+                virtual double Eval(Eigen::VectorXd const& F)const override{
+                        double c = 1.0;
+                        for(auto _ : index_){
+                                c *= F[_];
+                        }
+                        return c;
+                }
+        private:
+                std::vector<size_t> index_;
+        };
+        struct ProbabilityConstant : Probability{
+                ProbabilityConstant(double C):C_(C){}
+                virtual double Eval(Eigen::VectorXd const& F)const override{
+                        return C_;
+                }
+        private:
+                double C_;
+        };
+
+
+        struct ExpectedValue{
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept=0;
+        };
+        
+        struct ExpectedValueItem{
+                std::shared_ptr<Probability> Prob;
+                std::shared_ptr<ExpectedValue> Value;
+        };
+
+        struct AggregateExpectedValue : ExpectedValue{
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept override{
+                        for(auto const& _ : vec_){
+                                double p = _.Prob->Eval(F);
+                                _.Value->Eval(F, Y, a * p );
+                        }
+                }
+                void Add( std::shared_ptr<Probability> p, std::shared_ptr<ExpectedValue> v){
+                        vec_.emplace_back(ExpectedValueItem{p, v});
+                }
+        private:
+                std::vector<ExpectedValueItem> vec_;
+        };
+        
+        struct ExpectedValueVector : ExpectedValue{
+                explicit ExpectedValueVector(Eigen::VectorXd const& V):V_{V}{}
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept override{
+                        Y += V_ * a;
+                }
+        private:
+                Eigen::VectorXd V_;
+        };
+
+
+
+
+        struct VectorComputationBase{
+                /*
+                        For the domain im working with, everything can be expressed as this
+
+                                F -> will be the strategy vector linearlized
+                                Y -> output
+
+                 */
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept=0;
+        };
+        struct VectorComputationSymbolicConstant : VectorComputationBase{
+                VectorComputationSymbolicConstant(double C, std::vector<size_t> const& index, Eigen::VectorXd const& A)
+                        :C_(C),index_(index), A_(A)
+                {}
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept override{
+                        double c = 1.0;
+                        for(auto _ : index_){
+                                c *= F[_];
+                        }
+                        Y += C_ * c * A_;
+                }
+        private:
+                double C_;
+                std::vector<size_t> index_;
+                Eigen::VectorXd A_;
+        };
+
+        struct VectorAggregate 
+                : VectorComputationBase
+                , std::vector<std::shared_ptr<VectorComputationBase> >
+        {
+                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept override{
+                        for(auto _ : *this){
+                                _->Eval(F, Y);
+                        }
+                }
+        };
+
+
+        struct VectorComputation{
+                struct Item{
+                        holdem_class_vector cv;
+                        double constant;
+                        std::vector<size_t> index;
+                        Eigen::VectorXd value;
+                };
+                void Add(holdem_class_vector cv, double constant, std::vector<size_t> index, Eigen::VectorXd value){
+                        v_.emplace_back();
+                        v_.back().cv = std::move(cv);
+                        v_.back().constant = constant;
+                        v_.back().index = std::move(index);
+                        v_.back().value = std::move(value);
+                }
+                template<class Filter>
+                Eigen::VectorXd EvalConditional(Eigen::VectorXd const& F, Filter const& filter)const noexcept{
+                        Eigen::VectorXd R(2);
+                        R.fill(0);
+                        double sigma = 0.0;
+                        for(auto const& _ : v_){
+                                if( ! filter(_.index) )
+                                        continue;
+                                double c = _.constant;
+                                for(auto idx : _.index ){
+                                        c *= F[idx];
+                                }
+                                R += c * _.value; 
+                                sigma += c;
+                        }
+                        R /= sigma;
+                        return R;
+                }
+                Eigen::VectorXd Eval(Eigen::VectorXd const& F)const noexcept{
+                        return EvalConditional(F, [](auto&& _)noexcept{ return true; });
+                }
+        private:
+                std::vector<Item> v_;
+        };
+
+
+        struct HeadsUpComputation{
+                HeadsUpComputation(double sb, double bb, double eff){
+                        std::string cache_name{".cc.bin"};
+                        class_cache C;
+                        C.load(cache_name);
+
+                        size_t Index_P  = 0*169;
+                        size_t Index_F  = 1*169;
+                        size_t Index_PP = 2*169;
+                        size_t Index_PF = 3*169;
+
+                        Eigen::VectorXd v_pf(2);
+                        v_pf[0] = +bb;
+                        v_pf[1] = -bb;
+                        
+                        Eigen::VectorXd v_f(2);
+                        v_f[0] = -sb;
+                        v_f[1] = +sb;
+                                        
+                        Eigen::VectorXd eff_v(2);
+                        eff_v.fill(eff);
+
+                        auto agg = std::make_shared<VectorAggregate>();
+
+                        auto agg_p = std::make_shared<VectorAggregate>(); // non-terminal
+                        agg->push_back(agg_p);
+                        auto agg_f = std::make_shared<VectorAggregate>(); // terminal
+                        agg->push_back(agg_f);
+
+                        auto agg_pp = std::make_shared<VectorAggregate>(); // terminal
+                        agg_p->push_back(agg_pp);
+                        auto agg_pf = std::make_shared<VectorAggregate>(); // terminal
+                        agg_p->push_back(agg_pf);
+
+                        auto ev_root = std::make_shared<AggregateExpectedValue>();
+
+                        auto vc = std::make_shared<VectorComputation>();
+
+                        for(auto const& group : *Memory_TwoPlayerClassVector){
+                                for(auto const& _ : group.vec){
+                                        auto const& cv = _.cv;
+                        
+
+                                        Eigen::VectorXd ev = C.LookupVector(cv);
+                                        
+
+                                        /////////////// pp //////////
+                                        auto pp = std::make_shared<VectorComputationSymbolicConstant>(
+                                                _.prob,                      // constant
+                                                std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }, // index
+                                                2 * eff * ev - eff_v
+                                        );
+                                        agg_pp->push_back(pp);
+
+
+                                        
+                                        /////////////// pp //////////
+                                        auto pf = std::make_shared<VectorComputationSymbolicConstant>(
+                                                _.prob,                                         // constant
+                                                std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }, // index
+                                                v_pf
+                                        );
+                                        agg_pf->push_back(pf);
+
+                                        /////////////// pp //////////
+                                        auto f = std::make_shared<VectorComputationSymbolicConstant>(
+                                                _.prob,                                         // constant
+                                                std::vector<size_t>{ cv[0] + Index_F }, 
+                                                v_f
+                                        );
+                                        agg_f->push_back(f);
+                                        
+                                        
+                                        auto ev_deal = std::make_shared<AggregateExpectedValue>();
+                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }), std::make_shared<ExpectedValueVector>(2 * eff * ev - eff_v)); // pp
+                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }), std::make_shared<ExpectedValueVector>(v_pf)); // pf
+                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_F })                   , std::make_shared<ExpectedValueVector>(v_f)); // pf
+
+                                        ev_root->Add(std::make_shared<ProbabilityConstant>(_.prob), ev_deal);
+                                        
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }, 2 * eff * ev - eff_v); // pp
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }, v_pf); // pf
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_F }                   , v_f); // pf
+
+
+                                }
+                        }
+                        impl_ = agg;
+                        ev_ = ev_root;
+                        vc_ = vc;
+                }
+                Eigen::VectorXd Eval(std::vector<Eigen::VectorXd> const& S){
+
+                        Eigen::VectorXd F(169 * 4);
+                        F.fill(0);
+                        for(size_t i=0;i!=2;++i){
+                                for(size_t j=0;j!=169;++j){
+                                        F[i  * 169*2 + j       ] = S[i][j];
+                                        F[i  * 169*2 + j + 169 ] = 1.0 - S[i][j];
+                                }
+                        }
+                        
+                        Eigen::VectorXd R(2);
+                        R.fill(0);
+
+
+                        //impl_->Eval(F, R);
+                        //ev_->Eval(F, R, 1.0);
+                        R = vc_->Eval(F);
+
+                        return R;
+                }
+        private:
+                std::shared_ptr<VectorComputationBase> impl_;
+                std::shared_ptr<ExpectedValue> ev_;
+                std::shared_ptr<VectorComputation> vc_;
+        };
+
+
+} // end namespace ExpressionTreeV1
+
+
 namespace ps{
         struct cc_eval_view : binary_strategy_description::eval_view{
                 cc_eval_view(){
@@ -1554,21 +1824,39 @@ namespace ps{
                                 lines.push_back(std::vector<std::string>{"Eff", "SB", "BB"});
                                 lines.push_back(LineBreak);
                                 for(auto const& sol : mgr){
+                                        fprintf(stderr, "A\n"); // __CandyTag__ 
+
+                                        ExpressionTreeV1::HeadsUpComputation huc(0.5, 1.0, 10.0);
+                                        fprintf(stderr, "B\n"); // __CandyTag__ 
                                         auto desc = sol.description();
-                                        auto ev_r = desc->expected_value(sol.solution());
-                                        auto ev = ev_r.to_eigen();
+                                        Eigen::VectorXd ev;
+                                        Eigen::VectorXd other;
+                                        {
+                                                boost::timer::auto_cpu_timer at;
+                                                auto ev_r = desc->expected_value(sol.solution());
+                                                ev = ev_r.to_eigen();
+                                        }
+                                        {
+                                                boost::timer::auto_cpu_timer at;
+                                                other = huc.Eval(sol.solution());
+                                        }
                                         std::vector<std::string> line;
+
                                         char buf[18];
                                         std::sprintf(buf, "%.1f", desc->eff());
                                         line.push_back(buf);
                                         for(size_t idx=0;idx!=ev.size();++idx){
                                                 line.push_back(boost::lexical_cast<std::string>(ev[idx]));
                                         }
+                                        for(size_t idx=0;idx!=other.size();++idx){
+                                                line.push_back(boost::lexical_cast<std::string>(other[idx]));
+                                        }
                                         lines.push_back(std::move(line));
                                 }
                                 RenderTablePretty(std::cout, lines);
                         }
                 };
+
                 enum{ Debug = 1};
                 explicit
                 SolverCmd(std::vector<std::string> const& args):args_{args}{}
