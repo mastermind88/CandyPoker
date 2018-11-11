@@ -323,9 +323,6 @@ namespace ExpressionTreeV1{
                         std::cout << "v_.size() => " << v_.size() << "\n"; // __CandyPrint__(cxx-print-scalar,v_.size())
                         for(auto const& _ : v_){
                                 std::vector<std::string> line;
-                                if( _.cv.size() != 2 ){
-                                        throw std::domain_error("hmm");
-                                }
                                 line.push_back( _.cv.to_string() );
                                 line.push_back( boost::lexical_cast<std::string>(_.constant));
                                 line.push_back( detail::to_string(_.index) );
@@ -481,6 +478,24 @@ struct event_tree{
                                 }
                         }
                 }
+                using namespace Pretty;
+                std::vector<Pretty::LineItem> lines;
+                lines.push_back(LineBreak);
+                lines.push_back(std::vector<std::string>{"non-terminals"});
+                lines.push_back(LineBreak);
+                for(auto const& _ : non_terminals_){
+                        std::vector<std::string> line{ _->pretty() };
+                        lines.push_back(std::move(line));
+                }
+                lines.push_back(LineBreak);
+                lines.push_back(std::vector<std::string>{"terminals"});
+                lines.push_back(LineBreak);
+                for(auto const& _ : terminals_){
+                        std::vector<std::string> line{ _->pretty() };
+                        lines.push_back(std::move(line));
+                }
+                lines.push_back(LineBreak);
+                RenderTablePretty(std::cout, lines);
         }
 
         
@@ -773,16 +788,14 @@ struct strategy_decl{
                 size_t num_choices()const{ return alloc_.size(); }
                 size_t player_index()const{ return player_idx_; }
                 size_t at(size_t idx)const{ return alloc_[idx]; }
-                size_t s_index(size_t idx, size_t cid)const{
-                        return alloc_[idx] * 169 + cid;
-                }
+                auto const& alloc()const{ return alloc_; }
                 friend std::ostream& operator<<(std::ostream& ostr, strategy_choice_decl const& self){
                         ostr << "idx_ = " << self.idx_ << ",";
                         ostr << "pretty_ = " << self.ev_->pretty() << ",";
                         ostr << "player_idx_ = " << self.player_idx_ << ",";
                         typedef std::vector<size_t>::const_iterator CI0;
                         const char* comma = "";
-                        ostr << "\nalloc_" << " = {";
+                        ostr << "alloc_" << " = {";
                         for(CI0 iter= self.alloc_.begin(), end=self.alloc_.end();iter!=end;++iter){
                                 ostr << comma << *iter;
                                 comma = ", ";
@@ -819,6 +832,29 @@ struct strategy_decl{
                 ostr << "}\n";
                 return ostr;
         }
+        void Display()const{
+                using namespace Pretty;
+                std::vector<Pretty::LineItem> lines;
+                lines.push_back(std::vector<std::string>{"index", "num_choies", "player_index", "alloc"});
+                lines.push_back(LineBreak);
+                for(auto const& _ : choies_){
+                        std::vector<std::string> line;
+                        line.push_back( boost::lexical_cast<std::string>(_.index()));
+                        line.push_back( boost::lexical_cast<std::string>(_.num_choices()));
+                        line.push_back( boost::lexical_cast<std::string>(_.player_index()));
+                        line.push_back( detail::to_string(_.alloc()) );
+                        lines.push_back(std::move(line));
+                }
+                RenderTablePretty(std::cout, lines);
+                lines.clear();
+                lines.push_back(std::vector<std::string>{"idx", "pretty"});
+                lines.push_back(LineBreak);
+                for(auto const& _ : s_alloc_ ){
+                        lines.push_back(std::vector<std::string>{boost::lexical_cast<std::string>(_.second),
+                                                                 _.first->pretty() } );
+                }
+                RenderTablePretty(std::cout, lines);
+        }
 private:
         size_t dims_;
         event_tree const* root_;
@@ -848,11 +884,16 @@ public:
 
                 // I probably want some pretty ordering for strategy
                 std::vector<event_tree const*> alloc_aux;
+                for(auto iter=root->non_terminal_begin(), end=root->non_terminal_end();iter!=end;++iter){
+                        alloc_aux.push_back(&*iter);
+                }
+                #if 0
                 for(auto const& p : G){
                         for(auto ptr : p.second ){
                                 alloc_aux.push_back(ptr);
                         }
                 }
+                #endif
                 std::sort(alloc_aux.begin(), alloc_aux.end(), [](auto&& l, auto&& r){ return l->path().size() < r->path().size(); });
                 for(auto ptr : alloc_aux){
                         result.s_alloc_[ptr] = result.s_alloc_.size();
@@ -1025,7 +1066,6 @@ struct Scratch : Command{
         virtual int Execute()override{
                 //auto gt = event_tree::build_raise_fold(2, 0.5, 1.0, 10.0);
                 auto gt = event_tree::build(2, 0.5, 1.0, 10.0);
-                gt->display();
 
                 event_tree::to_string_visitor v;
                 for(auto iter=gt->terminal_begin(),end=gt->terminal_end();iter!=end;++iter){
@@ -1041,11 +1081,13 @@ struct Scratch : Command{
                 std::map<event_tree const*, std::vector<event_tree const*> > G;
 
                 strategy_decl sd = strategy_decl::generate(gt.get());
-                std::cout << sd << "\n";
 
                 auto vc = build_vc(sd);
 
                 vc->Display();
+                
+                sd.Display();
+                gt->display();
 
 
                 return EXIT_SUCCESS;
