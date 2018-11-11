@@ -137,112 +137,149 @@ using namespace ps;
 
 
 
+#if 0
+namespace ExpressionTreeV1{
+
+        using namespace ps;
+
+
+        struct VectorComputation{
+                VectorComputation(){
+                        v_.reserve(100'000);
+                        std::cout << "v_.size() => " << v_.size() << "\n"; // __CandyPrint__(cxx-print-scalar,v_.size())
+                }
+                struct Item{
+                        holdem_class_vector cv;
+                        double constant;
+                        std::vector<size_t> index;
+                        Eigen::VectorXd value;
+                };
+                void Add(holdem_class_vector const& cv, double constant, std::vector<size_t> const& index, Eigen::VectorXd const& value){
+                        v_.emplace_back( Item{ cv, constant, index, value} );
+
+                        if( v_.back().cv.size() != 2 )
+                                throw std::domain_error("hmm");
+                }
+                template<class Filter>
+                Eigen::VectorXd EvalConditional(Eigen::VectorXd const& F, Filter const& filter)const noexcept{
+                        Eigen::VectorXd R(2);
+                        R.fill(0);
+                        double sigma = 0.0;
+                        for(auto const& _ : v_){
+                                if( ! filter(_.index) )
+                                        continue;
+                                double c = _.constant;
+                                for(auto idx : _.index ){
+                                        c *= F[idx];
+                                }
+                                R += c * _.value; 
+                                sigma += c;
+                        }
+                        R /= sigma;
+                        return R;
+                }
+                Eigen::VectorXd Eval(Eigen::VectorXd const& F)const noexcept{
+                        return EvalConditional(F, [](auto&& _)noexcept{ return true; });
+                }
+                auto size()const{ return v_.size(); }
+
+                void Display()const{
+                        using namespace Pretty;
+                        std::vector<Pretty::LineItem> lines;
+                        std::cout << "v_.size() => " << v_.size() << "\n"; // __CandyPrint__(cxx-print-scalar,v_.size())
+                        for(auto const& _ : v_){
+                                std::vector<std::string> line;
+                                if( _.cv.size() != 2 ){
+                                        throw std::domain_error("hmm");
+                                }
+                                line.push_back( _.cv.to_string() );
+                                line.push_back( boost::lexical_cast<std::string>(_.constant));
+                                line.push_back( detail::to_string(_.index) );
+                                line.push_back( vector_to_string(_.value) );
+                                lines.push_back(std::move(line));
+                        }
+                        RenderTablePretty(std::cout, lines);
+                }
+        private:
+                std::vector<Item> v_;
+        };
+
+
+        struct HeadsUpComputation{
+                HeadsUpComputation(double sb, double bb, double eff){
+                        std::string cache_name{".cc.bin"};
+                        class_cache C;
+                        C.load(cache_name);
+
+                        size_t Index_P  = 0*169;
+                        size_t Index_F  = 1*169;
+                        size_t Index_PP = 2*169;
+                        size_t Index_PF = 3*169;
+
+                        Eigen::VectorXd v_pf(2);
+                        v_pf[0] = +bb;
+                        v_pf[1] = -bb;
+                        
+                        Eigen::VectorXd v_f(2);
+                        v_f[0] = -sb;
+                        v_f[1] = +sb;
+                                        
+                        Eigen::VectorXd eff_v(2);
+                        eff_v.fill(eff);
+
+                        auto vc = std::make_shared<VectorComputation>();
+
+                        for(auto const& group : *Memory_TwoPlayerClassVector){
+                                for(auto const& _ : group.vec){
+                                        auto const& cv = _.cv;
+                        
+
+                                        Eigen::VectorXd ev = C.LookupVector(cv);
+                                        
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }, 2 * eff * ev - eff_v); // pp
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }, v_pf); // pf
+                                        vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_F }                   , v_f); // pf
+
+                                        vc->Display();
+
+
+                                }
+                        }
+                        vc_ = vc;
+                        vc_->Display();
+                }
+                Eigen::VectorXd Eval(std::vector<Eigen::VectorXd> const& S){
+
+                        Eigen::VectorXd F(169 * 4);
+                        F.fill(0);
+                        for(size_t i=0;i!=2;++i){
+                                for(size_t j=0;j!=169;++j){
+                                        F[i  * 169*2 + j       ] = S[i][j];
+                                        F[i  * 169*2 + j + 169 ] = 1.0 - S[i][j];
+                                }
+                        }
+                        
+                        Eigen::VectorXd R(2);
+                        R.fill(0);
+
+
+                        R = vc_->Eval(F);
+
+                        return R;
+                }
+                void Display(){
+                        vc_->Display();
+                }
+        private:
+                std::shared_ptr<VectorComputation> vc_;
+        };
+
+
+} // end namespace ExpressionTreeV1
+#endif
 namespace ExpressionTreeV1{
         using namespace ps;
 
-        struct ProbabilityDistribution{
-        };
-
-        struct Probability{
-                virtual ~Probability()=default;
-                virtual double Eval(Eigen::VectorXd const& F)const=0;
-        };
-        struct ProbabilityIndex : Probability{
-                ProbabilityIndex(std::vector<size_t> const& index)
-                        :index_(index)
-                {}
-                virtual double Eval(Eigen::VectorXd const& F)const override{
-                        double c = 1.0;
-                        for(auto _ : index_){
-                                c *= F[_];
-                        }
-                        return c;
-                }
-        private:
-                std::vector<size_t> index_;
-        };
-        struct ProbabilityConstant : Probability{
-                ProbabilityConstant(double C):C_(C){}
-                virtual double Eval(Eigen::VectorXd const& F)const override{
-                        return C_;
-                }
-        private:
-                double C_;
-        };
-
-
-        struct ExpectedValue{
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept=0;
-        };
-        
-        struct ExpectedValueItem{
-                std::shared_ptr<Probability> Prob;
-                std::shared_ptr<ExpectedValue> Value;
-        };
-
-        struct AggregateExpectedValue : ExpectedValue{
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept override{
-                        for(auto const& _ : vec_){
-                                double p = _.Prob->Eval(F);
-                                _.Value->Eval(F, Y, a * p );
-                        }
-                }
-                void Add( std::shared_ptr<Probability> p, std::shared_ptr<ExpectedValue> v){
-                        vec_.emplace_back(ExpectedValueItem{p, v});
-                }
-        private:
-                std::vector<ExpectedValueItem> vec_;
-        };
-        
-        struct ExpectedValueVector : ExpectedValue{
-                explicit ExpectedValueVector(Eigen::VectorXd const& V):V_{V}{}
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y, double a)const noexcept override{
-                        Y += V_ * a;
-                }
-        private:
-                Eigen::VectorXd V_;
-        };
-
-
-
-
-        struct VectorComputationBase{
-                /*
-                        For the domain im working with, everything can be expressed as this
-
-                                F -> will be the strategy vector linearlized
-                                Y -> output
-
-                 */
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept=0;
-        };
-        struct VectorComputationSymbolicConstant : VectorComputationBase{
-                VectorComputationSymbolicConstant(double C, std::vector<size_t> const& index, Eigen::VectorXd const& A)
-                        :C_(C),index_(index), A_(A)
-                {}
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept override{
-                        double c = 1.0;
-                        for(auto _ : index_){
-                                c *= F[_];
-                        }
-                        Y += C_ * c * A_;
-                }
-        private:
-                double C_;
-                std::vector<size_t> index_;
-                Eigen::VectorXd A_;
-        };
-
-        struct VectorAggregate 
-                : VectorComputationBase
-                , std::vector<std::shared_ptr<VectorComputationBase> >
-        {
-                virtual void Eval(Eigen::VectorXd const& F, Eigen::VectorXd& Y)const noexcept override{
-                        for(auto _ : *this){
-                                _->Eval(F, Y);
-                        }
-                }
-        };
 
 
         struct VectorComputation{
@@ -280,6 +317,23 @@ namespace ExpressionTreeV1{
                 Eigen::VectorXd Eval(Eigen::VectorXd const& F)const noexcept{
                         return EvalConditional(F, [](auto&& _)noexcept{ return true; });
                 }
+                void Display()const{
+                        using namespace Pretty;
+                        std::vector<Pretty::LineItem> lines;
+                        std::cout << "v_.size() => " << v_.size() << "\n"; // __CandyPrint__(cxx-print-scalar,v_.size())
+                        for(auto const& _ : v_){
+                                std::vector<std::string> line;
+                                if( _.cv.size() != 2 ){
+                                        throw std::domain_error("hmm");
+                                }
+                                line.push_back( _.cv.to_string() );
+                                line.push_back( boost::lexical_cast<std::string>(_.constant));
+                                line.push_back( detail::to_string(_.index) );
+                                line.push_back( vector_to_string(_.value) );
+                                lines.push_back(std::move(line));
+                        }
+                        RenderTablePretty(std::cout, lines);
+                }
         private:
                 std::vector<Item> v_;
         };
@@ -307,20 +361,6 @@ namespace ExpressionTreeV1{
                         Eigen::VectorXd eff_v(2);
                         eff_v.fill(eff);
 
-                        auto agg = std::make_shared<VectorAggregate>();
-
-                        auto agg_p = std::make_shared<VectorAggregate>(); // non-terminal
-                        agg->push_back(agg_p);
-                        auto agg_f = std::make_shared<VectorAggregate>(); // terminal
-                        agg->push_back(agg_f);
-
-                        auto agg_pp = std::make_shared<VectorAggregate>(); // terminal
-                        agg_p->push_back(agg_pp);
-                        auto agg_pf = std::make_shared<VectorAggregate>(); // terminal
-                        agg_p->push_back(agg_pf);
-
-                        auto ev_root = std::make_shared<AggregateExpectedValue>();
-
                         auto vc = std::make_shared<VectorComputation>();
 
                         for(auto const& group : *Memory_TwoPlayerClassVector){
@@ -331,39 +371,6 @@ namespace ExpressionTreeV1{
                                         Eigen::VectorXd ev = C.LookupVector(cv);
                                         
 
-                                        /////////////// pp //////////
-                                        auto pp = std::make_shared<VectorComputationSymbolicConstant>(
-                                                _.prob,                      // constant
-                                                std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }, // index
-                                                2 * eff * ev - eff_v
-                                        );
-                                        agg_pp->push_back(pp);
-
-
-                                        
-                                        /////////////// pp //////////
-                                        auto pf = std::make_shared<VectorComputationSymbolicConstant>(
-                                                _.prob,                                         // constant
-                                                std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }, // index
-                                                v_pf
-                                        );
-                                        agg_pf->push_back(pf);
-
-                                        /////////////// pp //////////
-                                        auto f = std::make_shared<VectorComputationSymbolicConstant>(
-                                                _.prob,                                         // constant
-                                                std::vector<size_t>{ cv[0] + Index_F }, 
-                                                v_f
-                                        );
-                                        agg_f->push_back(f);
-                                        
-                                        
-                                        auto ev_deal = std::make_shared<AggregateExpectedValue>();
-                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }), std::make_shared<ExpectedValueVector>(2 * eff * ev - eff_v)); // pp
-                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }), std::make_shared<ExpectedValueVector>(v_pf)); // pf
-                                        ev_deal->Add(std::make_shared<ProbabilityIndex>(std::vector<size_t>{ cv[0] + Index_F })                   , std::make_shared<ExpectedValueVector>(v_f)); // pf
-
-                                        ev_root->Add(std::make_shared<ProbabilityConstant>(_.prob), ev_deal);
                                         
                                         vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PP }, 2 * eff * ev - eff_v); // pp
                                         vc->Add(cv, _.prob, std::vector<size_t>{ cv[0] + Index_P , cv[1] + Index_PF }, v_pf); // pf
@@ -372,9 +379,8 @@ namespace ExpressionTreeV1{
 
                                 }
                         }
-                        impl_ = agg;
-                        ev_ = ev_root;
                         vc_ = vc;
+                        vc_->Display();
                 }
                 Eigen::VectorXd Eval(std::vector<Eigen::VectorXd> const& S){
 
@@ -391,15 +397,14 @@ namespace ExpressionTreeV1{
                         R.fill(0);
 
 
-                        //impl_->Eval(F, R);
-                        //ev_->Eval(F, R, 1.0);
                         R = vc_->Eval(F);
 
                         return R;
                 }
+                void Display(){
+                        vc_->Display();
+                }
         private:
-                std::shared_ptr<VectorComputationBase> impl_;
-                std::shared_ptr<ExpectedValue> ev_;
                 std::shared_ptr<VectorComputation> vc_;
         };
 
@@ -498,6 +503,7 @@ struct event_tree{
 
 
         virtual void apply(visitor& v)const{
+                #if 0
                 std::vector<event_tree const*> path{this};
                 for(;;){
                         if( path.back()->parent_ == nullptr)
@@ -507,6 +513,11 @@ struct event_tree{
                 for(size_t idx=path.size();idx!=0;){
                         --idx;
                         path[idx]->apply_impl(v);
+                }
+                #endif
+                auto p = path();
+                for(auto ptr : p){
+                        ptr->apply_impl(v);
                 }
         }
 
@@ -522,6 +533,15 @@ struct event_tree{
                 to_string_visitor v;
                 apply(v);
                 return v.to_string();
+        }
+        std::vector<event_tree const*> path()const noexcept{
+                std::vector<event_tree const*> path{this};
+                for(;;){
+                        if( path.back()->parent_ == nullptr)
+                                break;
+                        path.push_back(path.back()->parent_);
+                }
+                return std::vector<event_tree const*>{ path.rbegin(), path.rend() };
         }
 private:
 
@@ -568,8 +588,8 @@ struct event_tree_hu_sb_bb : event_tree{
 private:
         virtual void apply_impl(visitor& v)const override{
                 v.path_decl(n_, eff_);
-                v.post_bb(0, bb_, false);
-                v.post_sb(1, sb_, false);
+                v.post_bb(1, bb_, false);
+                v.post_sb(0, sb_, false);
         }
         size_t n_;
         double sb_;
@@ -583,8 +603,8 @@ struct event_tree_sb_bb : event_tree{
 private:
         virtual void apply_impl(visitor& v)const override{
                 v.path_decl(n_, eff_);
-                v.post_sb(0, sb_, false);
-                v.post_bb(1, bb_, false);
+                v.post_sb(1, sb_, false);
+                v.post_bb(2, bb_, false);
         }
         size_t n_;
         double sb_;
@@ -627,7 +647,7 @@ std::shared_ptr<event_tree> event_tree::build_raise_fold(size_t n, double sb, do
         std::shared_ptr<event_tree> root;
 
         root = std::make_shared<event_tree_hu_sb_bb>(2, sb, bb, eff);
-        auto p = std::make_shared<event_tree_push>(1, eff);
+        auto p = std::make_shared<event_tree_push>(1, eff - sb);
         auto r = std::make_shared<event_tree_raise>(1, 2);
         auto f = std::make_shared<event_tree_fold>(1);
         root->add_child(p);
@@ -635,18 +655,18 @@ std::shared_ptr<event_tree> event_tree::build_raise_fold(size_t n, double sb, do
         root->add_child(f);
 
 
-        auto pp = std::make_shared<event_tree_push>(0, eff);
+        auto pp = std::make_shared<event_tree_push>(0, eff - bb);
         auto pf = std::make_shared<event_tree_fold>(0);
         p->add_child(pp);
         p->add_child(pf);
 
-        auto rp = std::make_shared<event_tree_push>(0, eff);
+        auto rp = std::make_shared<event_tree_push>(0, eff - bb);
         auto rf = std::make_shared<event_tree_fold>(0);
         
         r->add_child(rp);
         r->add_child(rf);
         
-        auto rpp = std::make_shared<event_tree_push>(1, eff);
+        auto rpp = std::make_shared<event_tree_push>(1, eff - sb - 2.0);
         auto rpf = std::make_shared<event_tree_fold>(1);
         rp->add_child(rpp);
         rp->add_child(rpf);
@@ -662,14 +682,14 @@ std::shared_ptr<event_tree> event_tree::build(size_t n, double sb, double bb, do
                 {
 
                         root = std::make_shared<event_tree_hu_sb_bb>(2, sb, bb, eff);
-                        auto p = std::make_shared<event_tree_push>(1, eff);
+                        auto p = std::make_shared<event_tree_push>(1, eff - sb);
                         auto f = std::make_shared<event_tree_fold>(1);
                         root->add_child(p);
                         root->add_child(f);
 
 
 
-                        auto pp = std::make_shared<event_tree_push>(0, eff);
+                        auto pp = std::make_shared<event_tree_push>(0, eff - bb);
                         auto pf = std::make_shared<event_tree_fold>(0);
                         p->add_child(pp);
                         p->add_child(pf);
@@ -753,6 +773,9 @@ struct strategy_decl{
                 size_t num_choices()const{ return alloc_.size(); }
                 size_t player_index()const{ return player_idx_; }
                 size_t at(size_t idx)const{ return alloc_[idx]; }
+                size_t s_index(size_t idx, size_t cid)const{
+                        return alloc_[idx] * 169 + cid;
+                }
                 friend std::ostream& operator<<(std::ostream& ostr, strategy_choice_decl const& self){
                         ostr << "idx_ = " << self.idx_ << ",";
                         ostr << "pretty_ = " << self.ev_->pretty() << ",";
@@ -774,9 +797,13 @@ struct strategy_decl{
                 std::vector<size_t> alloc_;
         };
         
-        size_t dimensions()const{ return dims_; }
-        auto begin()const{ return v_.begin(); }
-        auto end()const{ return v_.end(); }
+        size_t dimensions()const{ return s_alloc_.size(); }
+        auto begin()const{ return choies_.begin(); }
+        auto end()const{ return choies_.end(); }
+        size_t s_alloc(event_tree const* ev, size_t cid)const{
+                auto offset = s_alloc_.find(ev)->second;
+                return offset * 169 + cid;
+        }
 
         auto* root()const{ return root_; }
 
@@ -784,8 +811,8 @@ struct strategy_decl{
                 ostr << "dims_ = " << self.dims_;
                 typedef std::vector<strategy_choice_decl>::const_iterator CI0;
                 const char* comma = "";
-                ostr << "v_" << " = {";
-                for(CI0 iter= self.v_.begin(), end=self.v_.end();iter!=end;++iter){
+                ostr << "choies_" << " = {";
+                for(CI0 iter= self.choies_.begin(), end=self.choies_.end();iter!=end;++iter){
                         ostr << comma << *iter;
                         comma = ", ";
                 }
@@ -795,7 +822,8 @@ struct strategy_decl{
 private:
         size_t dims_;
         event_tree const* root_;
-        std::vector<strategy_choice_decl> v_;
+        std::vector<strategy_choice_decl> choies_;
+        std::map< event_tree const*, size_t> s_alloc_;
 
 public:
 
@@ -817,6 +845,20 @@ public:
                                 stack.push_back(&*iter);
                         }
                 }
+
+                // I probably want some pretty ordering for strategy
+                std::vector<event_tree const*> alloc_aux;
+                for(auto const& p : G){
+                        for(auto ptr : p.second ){
+                                alloc_aux.push_back(ptr);
+                        }
+                }
+                std::sort(alloc_aux.begin(), alloc_aux.end(), [](auto&& l, auto&& r){ return l->path().size() < r->path().size(); });
+                for(auto ptr : alloc_aux){
+                        result.s_alloc_[ptr] = result.s_alloc_.size();
+                }
+
+
                 typedef std::map<event_tree const*, std::vector<event_tree const*> >::const_iterator VI;
                 for(VI iter(G.begin()), end(G.end());iter!=end;++iter){
 
@@ -832,16 +874,14 @@ public:
                 }
                 
                 size_t choice_idx = 0;
-                size_t strat_idx = 0;
                 for(VI iter(G.begin()), end(G.end());iter!=end;++iter){
                         std::vector<size_t> alloc;
-                        for(;alloc.size() < iter->second.size();){
-                                alloc.push_back(strat_idx++);
+                        for(auto ptr : iter->second){
+                                alloc.push_back( result.s_alloc_[ptr] );
                         }
-                        result.v_.emplace_back(iter->first, choice_idx, iter->first->player_idx(), std::move(alloc));
+                        result.choies_.emplace_back(iter->first, choice_idx, iter->first->player_idx(), std::move(alloc));
                         ++choice_idx;
                 }
-                result.dims_ = strat_idx;
                 result.root_ = root;
                 return result;
         }
@@ -850,21 +890,134 @@ public:
 
 using namespace ExpressionTreeV1;
 
-struct computation_builder_sub{
-        virtual ~computation_builder_sub()=default;
-        virtual void emit(VectorComputation* vc, class_cache const* cache, holdem_class_vector const& cv, double P_cb)const noexcept=0;
-};
-struct computation_builder{
-        explicit computation_builder(strategy_decl const& S){
-                auto root = S.root();
-                for(auto iter = root->terminal_begin(), end = root->terminal_end();iter!=end;++iter){
-                        std::cout << iter->pretty() << "\n";
+namespace computation_builder_detail{
+        struct computation_builder_sub{
+                virtual ~computation_builder_sub()=default;
+                virtual void emit(VectorComputation* vc, class_cache const* cache, holdem_class_vector const& cv, double P_cb)const noexcept=0;
+        };
+        struct computation_builder_static : computation_builder_sub{
+                computation_builder_static(strategy_decl const& S, event_tree const* term, Eigen::VectorXd V)
+                        : S_{&S}, path_{term->path()}, V_{std::move(V)}
+                {}
+                virtual void emit(VectorComputation* vc, class_cache const* cache, holdem_class_vector const& cv, double P_cb)const noexcept override
+                {
+                        std::vector<size_t> index;
+                        for(size_t j=1;j!=path_.size();++j){
+                                auto ptr = path_[j];
+                                //std::cout << "ptr->pretty() => " << ptr->pretty() << "\n"; // __CandyPrint__(cxx-print-scalar,ptr->pretty())
+                                index.push_back( S_->s_alloc(ptr, cv.at(ptr->player_idx()) ) );
+                        }
+                        vc->Add(cv, P_cb, std::move(index), V_ );
+                }
+        private:
+                strategy_decl const* S_;
+                std::vector<event_tree const*> path_;
+                Eigen::VectorXd V_;
+        };
+        struct computation_builder_eval : computation_builder_sub{
+                computation_builder_eval(strategy_decl const& S, event_tree const* term, Eigen::VectorXd A, std::vector<size_t> perm)
+                        : S_{&S}, path_{term->path()}, A_{std::move(A)}, perm_{std::move(perm)}
+                {
+                        pot_ = -A_.sum();
+                }
+                virtual void emit(VectorComputation* vc, class_cache const* cache, holdem_class_vector const& cv, double P_cb)const noexcept override
+                {
+                        std::vector<size_t> index;
+                        for(size_t j=1;j!=path_.size();++j){
+                                auto ptr = path_[j];
+                                index.push_back( S_->s_alloc(ptr, cv[ptr->player_idx()] ) );
+                        }
+
+                        holdem_class_vector aux;
+                        for(auto _ : perm_ ){
+                                aux.push_back(cv[_]);
+                        }
+                        auto ev = cache->LookupVector(aux);
+                        ev *= pot_;
+                        Eigen::VectorXd ev_v(cv.size());
+                        ev_v.fill(0);
+                        size_t out_iter = 0;
+                        for(auto _ : perm_ ){
+                                ev_v[_] = ev[out_iter];
+                                ++out_iter;
+                        }
+
+                        ev_v += A_;
+
+                        vc->Add(cv, P_cb, std::move(index), std::move(ev_v) );
+                }
+        private:
+                strategy_decl const* S_;
+                std::vector<event_tree const*> path_;
+                Eigen::VectorXd A_;
+                std::vector<size_t> perm_;
+                double pot_;
+        };
+        struct visitor_impl : event_tree::visitor{
+                virtual void path_decl(size_t n, double eff)override{
+                        for(size_t idx=0;idx!=n;++idx){
+                                Active.insert(idx);
+                        }
+                        Eff = eff;
+                        Delta.resize(n);
+                        Delta.fill(0);
+                }
+                virtual void player_fold(event_tree const*, size_t player_idx)override{
+                        Active.erase(player_idx);
+                }
+                virtual void player_raise(event_tree const*, size_t player_idx, double amt, bool allin)override{
+                        Delta[player_idx] -= amt;
+                }
+                virtual void post_sb(size_t player_idx, double amt, bool allin)override{
+                        Delta[player_idx] -= amt;
+                }
+                virtual void post_bb(size_t player_idx, double amt, bool allin)override{
+                        Delta[player_idx] -= amt;
+                }
+                friend std::ostream& operator<<(std::ostream& ostr, visitor_impl const& self){
+                        ostr << "Delta = " << vector_to_string(self.Delta);
+                        ostr << ", Active = " << detail::to_string(self.Active);
+                        return ostr;
+                }
+                double Eff;
+                Eigen::VectorXd Delta;
+                std::set<size_t> Active;
+        };
+} // end namespace computation_builder_detail
+
+std::shared_ptr<VectorComputation> build_vc(strategy_decl const& S){
+        using namespace computation_builder_detail;
+        std::vector<std::shared_ptr<computation_builder_detail::computation_builder_sub> > builders_;
+        auto root = S.root();
+        for(auto iter = root->terminal_begin(), end = root->terminal_end();iter!=end;++iter){
+                visitor_impl V;
+                iter->apply(V);
+                std::cout << "V => " << V << "\n"; // __CandyPrint__(cxx-print-scalar,V)
+                if( V.Active.size() == 1 ){
+                        auto vec = V.Delta;
+                        auto sum = vec.sum();
+                        auto winner_idx = *V.Active.begin();
+                        vec[winner_idx] -= sum;
+                        builders_.push_back( std::make_shared<computation_builder_static>( S, &*iter, std::move(vec)) );
+                } else {
+                        std::vector<size_t> perm( V.Active.begin(), V.Active.end() );
+                        builders_.push_back( std::make_shared<computation_builder_eval>( S, &*iter, V.Delta, std::move(perm)) );
                 }
         }
-private:
-        std::vector<std::shared_ptr<computation_builder_sub> > builders_;
-};
-
+        auto vc = std::make_shared<VectorComputation>();
+        std::string cache_name{".cc.bin"};
+        class_cache C;
+        C.load(cache_name);
+        for(auto const& group : *Memory_TwoPlayerClassVector){
+                for(auto const& _ : group.vec){
+                        auto const& cv = _.cv;
+                        for( auto b : builders_ ){
+                                b->emit( vc.get(), &C, cv, _.prob );
+                        }
+                }
+        }
+        return vc;
+}
 
 struct Scratch : Command{
         explicit
@@ -879,7 +1032,10 @@ struct Scratch : Command{
                         iter->apply(v);
                         std::cout << v.to_string() << "\n";
                         v.clear();
+
                 }
+                HeadsUpComputation huc(0.5, 1.0, 10.0);
+                huc.Display();
 
                 std::vector<event_tree const*> non_terminals;
                 std::map<event_tree const*, std::vector<event_tree const*> > G;
@@ -887,7 +1043,10 @@ struct Scratch : Command{
                 strategy_decl sd = strategy_decl::generate(gt.get());
                 std::cout << sd << "\n";
 
-                computation_builder builder(sd);
+                auto vc = build_vc(sd);
+
+                vc->Display();
+
 
                 return EXIT_SUCCESS;
         }
