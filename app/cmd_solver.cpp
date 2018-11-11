@@ -713,8 +713,9 @@ namespace ps{
         struct Break{ std::string msg; };
         struct Error{ std::string msg; };
         struct SmallerFactor{};
+        struct Clamp{};
 
-        using  holdem_binary_solver_ctrl = boost::variant<Continue, Break, Error, SmallerFactor>;
+        using  holdem_binary_solver_ctrl = boost::variant<Continue, Break, Error, SmallerFactor, Clamp>;
 
         struct holdem_binary_solver;
 
@@ -855,6 +856,12 @@ namespace ps{
                                                 factor_ /= 2.0;
                                                 continue;
                                         }
+                                        if( auto ptr = boost::get<Clamp>(&result)){
+                                                for(auto& _ : next ){
+                                                        _ = clamp(_);
+                                                }
+                                                continue;
+                                        }
                                         PS_UNREACHABLE();
                                 }
 
@@ -970,11 +977,15 @@ namespace ps{
 
                         bool cond = norm < epsilon_;
                         if( cond )
+                                return Clamp{};
+                                //return Break{"lp_inf_stoppage_condition"};
+                        if( norm == 0.0 )
                                 return Break{"lp_inf_stoppage_condition"};
                         return Continue{};
                 }
         private:
                 double epsilon_;
+                bool clamped_{false};
         };
         // for this stoppage condtiion, we want that the ev is less than norm
         struct ev_diff_stoppage_condition : holdem_binary_solver_any_observer{
@@ -1340,6 +1351,7 @@ namespace ps{
         struct computation_manager{
                 struct work_item{
                         enum{ Debug = true };
+                        enum{ UseLedger = false };
                         // args
                         work_item(binary_strategy_description::eval_view* eval,
                                   std::string const& key,
@@ -1403,14 +1415,6 @@ namespace ps{
                                 }
                         }
                         void compute_single(){
-                                auto ledger = std::make_shared<holdem_binary_strategy_ledger>();
-                                if( ledger->try_load_or_default(ledger_name_ ) == false ){
-                                        if( hint_ ){
-                                                ledger->push(*hint_);
-                                        }
-                                } else {
-                                        std::cout << "loaded ledger of side " << ledger->size() << " (" << ledger_name_ << ")\n";
-                                }
                                 std::cout << "doing " << desc_->string_representation() << "\n";
                                 holdem_binary_solver solver;
                                 solver.use_description(desc_);
@@ -1422,7 +1426,17 @@ namespace ps{
                                         solver.add_observer(std::make_shared<table_observer>(desc_.get(), true));
                                         solver.add_observer(std::make_shared<strategy_printer>());
                                 }
-                                solver.add_observer(std::make_shared<solver_ledger>(ledger));
+                                if( UseLedger ){
+                                        auto ledger = std::make_shared<holdem_binary_strategy_ledger>();
+                                        if( ledger->try_load_or_default(ledger_name_ ) == false ){
+                                                if( hint_ ){
+                                                        ledger->push(*hint_);
+                                                }
+                                        } else {
+                                                std::cout << "loaded ledger of side " << ledger->size() << " (" << ledger_name_ << ")\n";
+                                        }
+                                        solver.add_observer(std::make_shared<solver_ledger>(ledger));
+                                }
                                 solver.add_observer(std::make_shared<lp_inf_stoppage_condition>(lp_epsilon_));
                                 solver.add_observer(std::make_shared<max_steps_condition>(max_steps_));
                                 solver.add_observer(std::make_shared<state_seq>());
@@ -1444,8 +1458,8 @@ namespace ps{
                         size_t n_;
                         double eff_;
 
-                        double lp_epsilon_{0.05};
-                        size_t max_steps_{200};
+                        double lp_epsilon_{0.005};
+                        size_t max_steps_{2000};
 
 
                         // data
@@ -1479,7 +1493,7 @@ namespace ps{
                                                                        eff);
                                 items_.push_back(item);
                         }
-                        mgr_.try_load_or_default(".computation_mgr");
+                        //mgr_.try_load_or_default(".computation_mgr");
                 }
                 void compute(){
                         std::vector<std::future<void> > v;
@@ -1573,6 +1587,9 @@ namespace ps{
                                 start_eff = 10.0;
                                 end_eff = 20.0;
                         }
+
+                        start_eff = 10.0;
+                        end_eff = 10.0;
 
                         for(double eff=start_eff;eff-1e-5 < end_eff;eff += d ){
                                 cd.EffectiveStacks.push_back(eff);
