@@ -31,8 +31,26 @@ namespace ps{
                                 }
                         }();
 
+
                         if( weight == 0 )
                                 return;
+                       do_accept(weight, R);
+                }
+                void accept(tag_aggregate const&, mask_set const& ms, std::vector<ranking_t> const& R)noexcept
+                {
+                        size_t weight = ms.count_disjoint(hv_mask);
+                        if( weight == 0 )
+                                return;
+                        do_accept(weight, R);
+                }
+                void accept(tag_singleton const&, size_t single_mask, std::vector<ranking_t> const& R)noexcept
+                {
+                        size_t weight = (( hv_mask & single_mask )==0?1:0);
+                        if( weight == 0 )
+                                return;
+                        do_accept(weight, R);
+                }
+                void do_accept(size_t weight, std::vector<ranking_t> const& R)noexcept{
 
                         auto r0 = R[allocation_[0]];
                         auto r1 = R[allocation_[1]];

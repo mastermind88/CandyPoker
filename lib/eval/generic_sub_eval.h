@@ -62,6 +62,24 @@ namespace ps{
                         }
                         detail::dispatch_ranked_vector_mat(mat, ranked, n, weight);
                 }
+                void accept(tag_aggregate, mask_set const& ms, std::vector<ranking_t> const& R)noexcept
+                {
+                        size_t weight = ms.count_disjoint(hv_mask);
+
+                        for(size_t i=0;i!=n;++i){
+                                ranked[i] = R[allocation_[i]];
+                        }
+                        detail::dispatch_ranked_vector_mat(mat, ranked, n, weight);
+                }
+                void accept(tag_singleton, size_t single_mask, std::vector<ranking_t> const& R)noexcept
+                {
+                        size_t weight = (( hv_mask & single_mask )==0?1:0);
+
+                        for(size_t i=0;i!=n;++i){
+                                ranked[i] = R[allocation_[i]];
+                        }
+                        detail::dispatch_ranked_vector_mat(mat, ranked, n, weight);
+                }
                 void finish(){
                         *iter_ = std::make_shared<matrix_instruction>(instr_->group(), mat * instr_->get_matrix());
                 }

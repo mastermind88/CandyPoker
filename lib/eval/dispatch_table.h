@@ -61,6 +61,9 @@ struct basic_sub_eval_factory{
         };
 };
 
+struct tag_singleton{};
+struct tag_aggregate{};
+
 } // end namespace ps
 
 #endif // LIB_EVAL_DISPATCH_TABLE_H
