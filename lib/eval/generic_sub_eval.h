@@ -29,7 +29,7 @@ namespace ps{
          */
         struct generic_sub_eval{
                 using iter_t = instruction_list::iterator;
-                generic_sub_eval(iter_t iter, card_eval_instruction* instr)
+                generic_sub_eval(iter_t iter, any_card_eval_vector_instruction* instr)
                         :iter_{iter}, instr_{instr}
                 {
                         hv   = instr->get_vector();
@@ -39,6 +39,7 @@ namespace ps{
                         mat.fill(0);
                 }
                 size_t hand_mask()const noexcept{ return hv_mask; }
+                auto get_type()const noexcept{ return instr_->get_type(); }
                 template<class ArrayType>
                 void accept_(mask_set const& ms, size_t n, ArrayType const& v){
                         size_t weight = ms.count_disjoint(hv_mask);
@@ -74,9 +75,13 @@ namespace ps{
                                 allocation_[idx] = alloc(hv[idx]);
                         }
                 }
+                
+                void display()const{
+                        PS_LOG(trace) << instr_->to_string();
+                }
         private:
                 iter_t iter_;
-                card_eval_instruction* instr_;
+                any_card_eval_vector_instruction* instr_;
                 std::array<ranking_t, 9> ranked;
                 holdem_hand_vector hv;
                 size_t hv_mask;

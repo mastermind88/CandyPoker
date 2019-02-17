@@ -189,27 +189,38 @@ struct pass_collect : computation_pass{
         virtual void transform(computation_context* ctx, instruction_list* instr_list, computation_result* result)override{
                 using iter_type = decltype(instr_list->begin());
 
-                std::vector<iter_type> subset;
+                std::unordered_map<int, std::vector<iter_type> > subsets;
 
                 for(iter_type iter(instr_list->begin()),end(instr_list->end());iter!=end;++iter){
-                        if( (*iter)->get_type() == instruction::T_CardEval )
-                                subset.push_back(iter);
-                }
-
-
-                for(; subset.size() >= 2 ;){
-                        auto a = reinterpret_cast<card_eval_instruction*>(&**subset[subset.size()-1]);
-                        auto b = reinterpret_cast<card_eval_instruction*>(&**subset[subset.size()-2]);
-
-                        if( a->get_vector() == b->get_vector() ){
-                                b->set_matrix( a->get_matrix() + b->get_matrix() );
-                                instr_list->erase(subset.back());
-                                subset.pop_back();
-                        }  else{
-                                subset.pop_back();
+                        auto type = (*iter)->get_type();
+                        switch(type){
+                        case instruction::T_CardEval:
+                        case instruction::T_CardNoFlushEval:
+                        case instruction::T_CardMaybeFlushEval:
+                                subsets[type].push_back(iter);
+                                break;
                         }
                 }
 
+
+                auto fold_subset = [&](auto& subset, auto traits){
+                        using instr_type = typename std::decay_t<decltype(traits)>::type;
+                        for(; subset.size() >= 2 ;){
+                                auto a = reinterpret_cast<instr_type*>(&**subset[subset.size()-1]);
+                                auto b = reinterpret_cast<instr_type*>(&**subset[subset.size()-2]);
+
+                                if( a->get_vector() == b->get_vector() ){
+                                        b->set_matrix( a->get_matrix() + b->get_matrix() );
+                                        instr_list->erase(subset.back());
+                                        subset.pop_back();
+                                }  else{
+                                        subset.pop_back();
+                                }
+                        }
+                };
+                fold_subset( subsets[instruction::T_CardEval]          , card_eval_traits());
+                fold_subset( subsets[instruction::T_CardNoFlushEval]   , card_no_flush_traits());
+                fold_subset( subsets[instruction::T_CardMaybeFlushEval], card_maybe_flush_traits());
         }
 };
 struct pass_print : computation_pass{
@@ -284,6 +295,34 @@ struct pass_check_matrix_duplicates : computation_pass{
         }
 };
 #endif
+
+
+
+struct pass_segregate_flush : computation_pass{
+        virtual void transform(computation_context* ctx, instruction_list* instr_list, computation_result* result)override{
+                using iter_type = decltype(instr_list->begin());
+                std::vector<iter_type> toerase;
+                for(auto iter=instr_list->begin(),end=instr_list->end();iter!=end;++iter){
+                        if( (*iter)->get_type() != instruction::T_CardEval )
+                                continue;
+                        toerase.push_back(iter);
+                }
+                for(auto iter : toerase ){
+                        auto instr = reinterpret_cast<card_eval_instruction*>(iter->get());
+                        auto no_flush = std::make_shared<card_no_flush_eval_instruction>(
+                                instr->group(),
+                                instr->get_vector(),
+                                instr->get_matrix());
+                        auto maybe_flush = std::make_shared<card_maybe_flush_eval_instruction>(
+                                instr->group(),
+                                instr->get_vector(),
+                                instr->get_matrix());
+                        instr_list->push_back(no_flush);
+                        instr_list->push_back(maybe_flush);
+                        instr_list->erase(iter);
+                }
+        }
+};
 
 } // end namespace ps
 

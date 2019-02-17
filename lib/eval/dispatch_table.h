@@ -55,7 +55,7 @@ struct basic_sub_eval_factory{
         template<class T>
         struct bind{
                 using sub_ptr_type = std::shared_ptr<T>;
-                sub_ptr_type operator()(instruction_list::iterator iter, card_eval_instruction* instr)const{
+                sub_ptr_type operator()(instruction_list::iterator iter, any_card_eval_vector_instruction* instr)const{
                         return std::make_shared<T>(iter, instr);
                 }
         };
@@ -101,7 +101,7 @@ struct block_sub_eval_factory{
                 bind(){
                         blocks.push_back(std::make_unique<block>());
                 }
-                sub_ptr_type operator()(instruction_list::iterator iter, card_eval_instruction* instr){
+                sub_ptr_type operator()(instruction_list::iterator iter, any_card_eval_vector_instruction* instr){
                         auto raw = [&](){
                                 auto teptr = blocks.back()->allocate(sizeof(T));
                                 if( !! teptr )

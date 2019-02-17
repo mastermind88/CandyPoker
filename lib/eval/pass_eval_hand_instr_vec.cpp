@@ -273,8 +273,13 @@ struct pass_eval_hand_instr_vec_impl{
                 std::vector<instruction_list::iterator> to_map;
 
                 for(auto iter(instr_list->begin()),end(instr_list->end());iter!=end;++iter){
-                        if( (*iter)->get_type() == instruction::T_CardEval ){
+                        auto type = (*iter)->get_type();
+                        switch(type){
+                        case instruction::T_CardEval:
+                        case instruction::T_CardNoFlushEval:
+                        case instruction::T_CardMaybeFlushEval:
                                 to_map.push_back(iter);
+                                break;
                         }
                 }
                 // short circuit
@@ -284,7 +289,7 @@ struct pass_eval_hand_instr_vec_impl{
                 std::unordered_set<size_t> n_dist;
 
                 for(auto iter : to_map){
-                        auto instr = reinterpret_cast<card_eval_instruction*>((*iter).get());
+                        auto instr = reinterpret_cast<any_card_eval_vector_instruction*>((*iter).get());
                         n_dist.insert(instr->get_vector().size());
                 }
 

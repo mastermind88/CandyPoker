@@ -117,6 +117,7 @@ struct MaskEval : Command{
                         mgr.add_pass<pass_print>();
                 mgr.add_pass<pass_permutate>();
                 mgr.add_pass<pass_sort_type>();
+                mgr.add_pass<pass_segregate_flush>();
                 mgr.add_pass<pass_collect>();
                 if( debug )
                         mgr.add_pass<pass_print>();

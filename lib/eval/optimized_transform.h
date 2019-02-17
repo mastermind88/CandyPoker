@@ -30,7 +30,7 @@ struct optimized_transform : optimized_transform_base
                 std::vector<sub_ptr_type> subs;
 
                 for(auto& target : target_list){
-                        auto instr = reinterpret_cast<card_eval_instruction*>((*target).get());
+                        auto instr = reinterpret_cast<any_card_eval_vector_instruction*>((*target).get());
                         subs.push_back( factory(target, instr) );
                 }
 
@@ -94,11 +94,11 @@ struct optimized_transform : optimized_transform_base
 
                 for(auto const& b : otc.w.weighted_aggregate_rng() ){
                         apply_any_board(b);
-                        shed.end_eval(&b.masks, 0ull);
+                        shed.end_eval_no_flush(&b.masks, 0ull);
                 }
                 for(auto const& b : otc.w.weighted_singleton_rng() ){
                         apply_any_board(b);
-                        shed.end_eval(nullptr, b.single_rank_mask());
+                        shed.end_eval_maybe_flush(&b.masks, 0ull);
                 }
 
                 shed.regroup();
