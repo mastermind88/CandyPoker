@@ -52,9 +52,12 @@ struct instruction{
                 T_ClassEval,
                 T_Matrix,
                 T_ClassVec,
+                // here we segregate the evals
+                T_NoFlushCardEval,
+                T_MaybeFlushCardEval,
         };
-        explicit instruction(std::string const& grp, type t)
-                :group_{grp}, type_{t}
+        explicit instruction(std::string const& grp, int t)
+                :group_{grp}, type_{(type)t}
         {}
         type get_type()const{ return type_; }
 
@@ -113,20 +116,20 @@ private:
         std::string dbg_msg_;
 };
 
-template<class VectorType, instruction::type Type>
+template<class Traits>
 struct basic_eval_instruction : instruction{
 
-        using vector_type = VectorType;
+        using vector_type = typename Traits::vector_type;
         using self_type = basic_eval_instruction;
 
         basic_eval_instruction(std::string const& grp, vector_type const& vec)
-                : instruction{grp, Type}
+                : instruction{grp, Traits::type }
                 , vec_{vec}
                 , matrix_{matrix_t::Identity(vec.size(), vec.size())}
         {
         }
         basic_eval_instruction(std::string const& grp, vector_type const& vec, matrix_t const& matrix)
-                : instruction{grp, Type}
+                : instruction{grp, Traits::type}
                 , vec_{vec}
                 , matrix_{matrix}
         {
@@ -144,9 +147,12 @@ struct basic_eval_instruction : instruction{
                 matrix_ = matrix;
         }
         virtual std::string to_string()const override{
+                return Traits::to_string(*this);
+                #if 0
                 std::stringstream sstr;
                 sstr << (Type == T_CardEval ? "CardEval" : "ClassEval" ) << "{" << vec_ << ", " << matrix_to_string(matrix_) << "}";
                 return sstr.str();
+                #endif
         }
         
         virtual std::shared_ptr<instruction> clone()const override{
@@ -163,8 +169,30 @@ private:
         matrix_t matrix_;
 };
 
-using card_eval_instruction  = basic_eval_instruction<holdem_hand_vector, instruction::T_CardEval>;
-using class_eval_instruction = basic_eval_instruction<holdem_class_vector, instruction::T_ClassEval>;
+struct card_eval_traits{
+        enum{ type = instruction::T_CardEval };
+        using vector_type = holdem_hand_vector;
+        template<class Self>
+        static std::string to_string(Self const& self){
+                std::stringstream sstr;
+                sstr << "CardEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << "}";
+                return sstr.str();
+        }
+};
+
+struct class_eval_traits{
+        enum{ type = instruction::T_ClassEval };
+        using vector_type = holdem_class_vector;
+        template<class Self>
+        static std::string to_string(Self const& self){
+                std::stringstream sstr;
+                sstr << "ClassEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << "}";
+                return sstr.str();
+        }
+};
+
+using card_eval_instruction  = basic_eval_instruction<card_eval_traits>;
+using class_eval_instruction = basic_eval_instruction<class_eval_traits>;
 
 
 using instruction_list = std::list<std::shared_ptr<instruction> >;
