@@ -92,13 +92,19 @@ struct optimized_transform : optimized_transform_base
 
                 };
 
-                for(auto const& b : otc.w.weighted_aggregate_rng() ){
-                        apply_any_board(b);
-                        shed.end_eval_no_flush(&b.masks, 0ull);
+                {
+                        boost::timer::auto_cpu_timer at("no    flush took %w seconds\n");
+                        for(auto const& b : otc.w.weighted_aggregate_rng() ){
+                                apply_any_board(b);
+                                shed.end_eval_no_flush(&b.masks, 0ull);
+                        }
                 }
-                for(auto const& b : otc.w.weighted_singleton_rng() ){
-                        apply_any_board(b);
-                        shed.end_eval_maybe_flush(&b.masks, 0ull);
+                {
+                        boost::timer::auto_cpu_timer at("maybe flush took %w seconds\n");
+                        for(auto const& b : otc.w.weighted_singleton_rng() ){
+                                apply_any_board(b);
+                                shed.end_eval_maybe_flush(&b.masks, 0ull);
+                        }
                 }
 
                 shed.regroup();
