@@ -50,10 +50,10 @@ struct instruction{
         enum type{
                 T_ClassEval          =1 << 1,
                 T_Matrix             =1 << 2,
-                T_ClassVec           =1 << 4,
+                T_ClassVec           =1 << 3,
                 // here we segregate the evals
-                T_CardNoFlushEval    =1 << 8,
-                T_CardMaybeFlushEval =1 << 16,
+                T_CardNoFlushEval    =1 << 4,
+                T_CardMaybeFlushEval =1 << 5,
                 T_CardEval           =T_CardNoFlushEval | T_CardMaybeFlushEval,
         };
         explicit instruction(std::string const& grp, int t)

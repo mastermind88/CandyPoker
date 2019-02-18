@@ -79,13 +79,15 @@ struct MaskEval : Command{
                 std::vector<std::string> players_s;
                 // way to choose a specific one
                 std::string engine;
+                bool seg{false};
 
                 bpo::options_description desc("Solver command");
                 desc.add_options()
                         ("debug"     , bpo::value(&debug)->implicit_value(true), "debug flag")
                         ("help"      , bpo::value(&help)->implicit_value(true), "this message")
                         ("player"    , bpo::value(&players_s), "player ranges")
-                        ("engine"     , bpo::value(&engine), "choose speicifc eval mechinism")
+                        ("engine"    , bpo::value(&engine), "choose speicifc eval mechinism")
+                        ("seg"       , bpo::value(&seg)->implicit_value(true), "regregate flushes and non-flushes")
                 ;
 
                 bpo::positional_options_description pd;
@@ -117,7 +119,9 @@ struct MaskEval : Command{
                         mgr.add_pass<pass_print>();
                 mgr.add_pass<pass_permutate>();
                 mgr.add_pass<pass_sort_type>();
-                mgr.add_pass<pass_segregate_flush>();
+                if( seg ){
+                        mgr.add_pass<pass_segregate_flush>();
+                }
                 mgr.add_pass<pass_collect>();
                 if( debug )
                         mgr.add_pass<pass_print>();

@@ -41,17 +41,27 @@ namespace ps{
                                 evals_.resize(batch_size);
                                 
                                 for(auto const& _ : subs ){
-                                        _->display();
-                                        auto flush_bit = !( _->get_type() | instruction::T_CardMaybeFlushEval );
-                                        if( flush_bit ){
+                                        //_->display();
+                                        if( !!( _->get_type() & instruction::T_CardMaybeFlushEval ) ){
                                                 maybe_flush_subs_.push_back(_);
-                                        } else {
+                                        }
+                                        if( !!( _->get_type() & instruction::T_CardNoFlushEval ) ){
                                                 no_flush_subs_.push_back(_);
                                         }
                                 }
 
                                 PS_LOG(trace) << "maybe_flush_subs_.size() => " << maybe_flush_subs_.size();
+                                #if 0
+                                for(auto const& _ : maybe_flush_subs_){
+                                        _->display();
+                                }
+                                #endif
                                 PS_LOG(trace) << "no_flush_subs_.size() => " << no_flush_subs_.size();
+                                #if 0
+                                for(auto const& _ : no_flush_subs_){
+                                        _->display();
+                                }
+                                #endif
                         }
                         void put(size_t index, ranking_t rank)noexcept{
                                 evals_[index] = rank;

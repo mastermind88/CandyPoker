@@ -8,7 +8,7 @@ namespace ps{
         struct sub_eval_three{
                 enum{ PlayerSize = 3};
                 using iter_t = instruction_list::iterator;
-                sub_eval_three(iter_t iter, card_eval_instruction* instr)
+                sub_eval_three(iter_t iter, any_card_eval_vector_instruction* instr)
                         :iter_{iter}, instr_{instr}
                 {
                         hv   = instr->get_vector();
@@ -18,6 +18,7 @@ namespace ps{
                         draw2_.fill(0);
                         draw3_.fill(0);
                 }
+                auto get_type()const noexcept{ return instr_->get_type(); }
                 size_t hand_mask()const noexcept{ return hv_mask; }
                 void accept_weight(eval_counter_type weight, std::vector<ranking_t> const& R)noexcept
                 {
@@ -85,7 +86,7 @@ namespace ps{
                 }
         private:
                 iter_t iter_;
-                card_eval_instruction* instr_;
+                any_card_eval_vector_instruction* instr_;
 
                 holdem_hand_vector hv;
                 size_t hv_mask;
@@ -214,6 +215,7 @@ namespace ps{
         
         
         
+        #if 0
         struct sub_eval_three_perm{
                 enum{ UpperMask = 0b111 + 1 };
                 using iter_t = instruction_list::iterator;
@@ -305,6 +307,7 @@ namespace ps{
                 virtual size_t precedence()const override{ return 101; }
         };
         static register_disptach_table<dispatch_three_player_perm> reg_dispatch_three_player_perm;
+        #endif 
 
 
 } // end namespace ps
