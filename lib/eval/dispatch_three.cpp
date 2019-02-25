@@ -71,7 +71,9 @@ namespace ps{
                                 mat(1, idx) += draw2_[idx];
                                 mat(2, idx) += draw3_[idx];
                         }
-                        *iter_ = std::make_shared<matrix_instruction>(instr_->group(), mat * instr_->get_matrix(), instr_->to_string());
+                        std::stringstream dbg_msg;
+                        dbg_msg << instr_->to_string() << ", raw=" << matrix_to_string(mat);
+                        *iter_ = std::make_shared<matrix_instruction>(instr_->group(), mat * instr_->get_matrix(), dbg_msg.str());
                 }
                 void declare(std::unordered_set<holdem_id>& S)noexcept{
                         for(auto _ : hv){

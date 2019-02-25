@@ -159,6 +159,14 @@ namespace rank_hasher{
                 return hash;
         }
         inline
+        rank_hash_t create_from_cards(holdem_hand_vector const& hv) noexcept{
+                auto hash = create();
+                for(auto _ : hv.to_card_vector() ){
+                        hash = append(hash, card_rank_from_id(_));
+                }
+                return hash;
+        }
+        inline
         const rank_hash_t max()noexcept{
                 return create(12,12,12,12,11,11,11);
         }

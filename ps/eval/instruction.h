@@ -42,6 +42,7 @@ SOFTWARE.
 #include "ps/base/algorithm.h"
 #include "ps/base/frontend.h"
 #include "ps/base/tree.h"
+#include "ps/base/rank_hasher.h"
 
 namespace ps{
         
@@ -142,6 +143,9 @@ struct any_eval_vector_instruction : instruction{
         matrix_t const& get_matrix()const{
                 return matrix_;
         }
+        matrix_t& get_matrix(){
+                return matrix_;
+        }
         void set_matrix(matrix_t const& matrix){
                 matrix_ = matrix;
         }
@@ -196,7 +200,8 @@ struct card_eval_traits{
         template<class Self>
         static std::string to_string(Self const& self){
                 std::stringstream sstr;
-                sstr << "CardEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << "}";
+                auto hash = rank_hasher::create_from_cards(self.get_vector());
+                sstr << "CardEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << ", " << hash << "}";
                 return sstr.str();
         }
         using type = basic_eval_instruction<card_eval_traits>;
@@ -209,7 +214,8 @@ struct card_no_flush_traits{
         template<class Self>
         static std::string to_string(Self const& self){
                 std::stringstream sstr;
-                sstr << "CardNoFlushEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << "}";
+                auto hash = rank_hasher::create_from_cards(self.get_vector());
+                sstr << "CardNoFlushEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << ", " << hash << "}";
                 return sstr.str();
         }
         using type = basic_eval_instruction<card_no_flush_traits>;
@@ -221,7 +227,8 @@ struct card_maybe_flush_traits{
         template<class Self>
         static std::string to_string(Self const& self){
                 std::stringstream sstr;
-                sstr << "CardMaybeFlushEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << "}";
+                auto hash = rank_hasher::create_from_cards(self.get_vector());
+                sstr << "CardMaybeFlushEval{" << self.get_vector() << ", " << matrix_to_string(self.get_matrix()) << ", " << hash << "}";
                 return sstr.str();
         }
 

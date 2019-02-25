@@ -80,14 +80,16 @@ struct MaskEval : Command{
                 // way to choose a specific one
                 std::string engine;
                 bool seg{false};
+                bool seg_collect{false};
 
                 bpo::options_description desc("Solver command");
                 desc.add_options()
-                        ("debug"     , bpo::value(&debug)->implicit_value(true), "debug flag")
-                        ("help"      , bpo::value(&help)->implicit_value(true), "this message")
-                        ("player"    , bpo::value(&players_s), "player ranges")
-                        ("engine"    , bpo::value(&engine), "choose speicifc eval mechinism")
-                        ("seg"       , bpo::value(&seg)->implicit_value(true), "regregate flushes and non-flushes")
+                        ("debug"      , bpo::value(&debug)->implicit_value(true), "debug flag")
+                        ("help"       , bpo::value(&help)->implicit_value(true), "this message")
+                        ("player"     , bpo::value(&players_s), "player ranges")
+                        ("engine"     , bpo::value(&engine), "choose speicifc eval mechinism")
+                        ("seg"        , bpo::value(&seg)->implicit_value(true), "regregate flushes and non-flushes")
+                        ("seg-collect", bpo::value(&seg_collect)->implicit_value(true), "collects no flushes")
                 ;
 
                 bpo::positional_options_description pd;
@@ -115,14 +117,19 @@ struct MaskEval : Command{
                 computation_context comp_ctx{players.size()};
 
                 computation_pass_manager mgr;
+                #if 0
                 if( debug )
                         mgr.add_pass<pass_print>();
+                #endif
                 mgr.add_pass<pass_permutate>();
                 mgr.add_pass<pass_sort_type>();
                 if( seg ){
                         mgr.add_pass<pass_segregate_flush>();
                 }
                 mgr.add_pass<pass_collect>();
+                if( seg_collect ){
+                        mgr.add_pass<pass_collect_no_flush>();
+                }
                 if( debug )
                         mgr.add_pass<pass_print>();
                 mgr.add_pass<pass_eval_hand_instr_vec>(engine);

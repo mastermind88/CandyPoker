@@ -141,7 +141,7 @@ std::tuple<
 std::tuple<
         std::vector<int>,
         std::vector<ps::holdem_id>
-> permutate_for_the_better( std::vector<ps::holdem_id> const& players );
+> permutate_for_the_better( holdem_hand_vector const& players );
 
 #if 0
 std::tuple<

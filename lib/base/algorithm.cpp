@@ -104,9 +104,10 @@ struct suit_perm_info{
 std::tuple<
         std::vector<int>,
         std::vector<holdem_id>
-> permutate_for_the_better( std::vector<holdem_id> const& players )
+> permutate_for_the_better( holdem_hand_vector const& players )
 {
         enum{ Debug = false };
+        enum{ DebugFinal = true };
 
         std::vector< rank_info > ri;
         for(size_t idx=0;idx!=players.size();++idx){
@@ -225,7 +226,9 @@ std::tuple<
                         PS_LOG(trace) << "    -" << sp.hv;
                 }
                 PS_LOG(trace) << "end   rank_permutations";
-                PS_LOG(trace) << "hv = " << suit_perm_vec.front().hv;
+        }
+        if( Debug || DebugFinal ){
+                PS_LOG(trace) << "permutate_for_the_better(" << players << ") => " << suit_perm_vec.front().hv;
         }
 
         return { suit_perm_vec.front().player_perm, suit_perm_vec.front().hv };

@@ -31,6 +31,7 @@ SOFTWARE.
 
 #include <unordered_map>
 #include "ps/eval/instruction.h"
+#include "ps/base/rank_hasher.h"
 
 namespace ps{
 
@@ -321,6 +322,35 @@ struct pass_segregate_flush : computation_pass{
                         instr_list->push_back(maybe_flush);
                         instr_list->erase(iter);
                 }
+        }
+};
+
+struct pass_collect_no_flush : computation_pass{
+        virtual void transform(computation_context* ctx, instruction_list* instr_list, computation_result* result)override{
+                using iter_type = decltype(instr_list->begin());
+                std::unordered_map<rank_hasher::rank_hash_t, std::vector<iter_type> > grouped;
+                for(auto iter=instr_list->begin(),end=instr_list->end();iter!=end;++iter){
+                        if( (*iter)->get_type() != instruction::T_CardNoFlushEval )
+                                continue;
+                        auto instr = reinterpret_cast<card_no_flush_eval_instruction*>(iter->get());
+                        auto hv = instr->get_vector();
+                        auto rh = rank_hasher::create_from_cards(hv);
+                        grouped[rh].push_back(iter);
+                }
+                PS_LOG(trace) << "grouped.size() = " << grouped.size();
+                for(auto const& group : grouped ){
+                        auto const& V = group.second;
+                        if( V.size() == 1 )
+                                continue;
+                        auto* head = reinterpret_cast<card_no_flush_eval_instruction*>(V[0]->get());
+                        for(size_t idx=1;idx!=V.size();++idx){
+                                //     ^  start from 1
+                                auto* tail = reinterpret_cast<card_no_flush_eval_instruction*>(V[idx]->get());
+                                head->get_matrix() += tail->get_matrix();
+                                instr_list->erase(V[idx]);
+                        }
+                }
+
         }
 };
 
